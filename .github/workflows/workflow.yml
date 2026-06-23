@@ -290,6 +290,9 @@ jobs:
           - corpus: "aes256_cbc"
             target: "aes256_cbc"
             cxxflags: "-DBITCOIN_CORE -DRUSTCRYPTO_AES"
+          - corpus: "musig2_sign_session"
+            target: "musig2_sign_session"
+            cxxflags: "-DRUST_MUSIG2 -DSECP256K1"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
 
     steps:

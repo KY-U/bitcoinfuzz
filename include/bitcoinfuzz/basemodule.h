@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -8,6 +9,23 @@
 #include <vector>
 
 namespace bitcoinfuzz {
+struct Musig2Tweak {
+  bool is_xonly{false};
+  std::array<uint8_t, 32> tweak{};
+};
+
+struct Musig2SignSessionInput {
+  std::vector<uint8_t> seckeys;
+  std::vector<uint8_t> msg32;
+  std::vector<uint8_t> nonce_seeds;
+  // Optional 32-byte extra input mixed into BIP-327 nonce generation.
+  bool use_extra_input{false};
+  std::vector<uint8_t> extra_input;
+  // Applied in order; BIP-327 allows arbitrary chains of x-only and plain
+  // tweaks (e.g. plain BIP32 tweaks followed by an x-only taproot tweak).
+  std::vector<Musig2Tweak> tweaks;
+};
+
 class BaseModule {
 public:
   const std::string name;
@@ -90,6 +108,8 @@ public:
   virtual std::optional<std::string>
   aes256_cbc(std::span<const uint8_t> key, std::span<const uint8_t> iv,
              bool pad, std::span<const uint8_t> data) const;
+  virtual std::optional<std::string>
+  musig2_sign_session(const Musig2SignSessionInput &input) const;
 
   virtual ~BaseModule() noexcept;
 };

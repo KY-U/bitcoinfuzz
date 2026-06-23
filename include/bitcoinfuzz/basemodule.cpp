@@ -183,5 +183,9 @@ BaseModule::aes256_cbc(std::span<const uint8_t> /*key*/,
                        std::span<const uint8_t> /*data*/) const {
   return std::nullopt;
 }
+std::optional<std::string> BaseModule::musig2_sign_session(
+    const Musig2SignSessionInput & /*input*/) const {
+  return std::nullopt;
+}
 
 } // namespace bitcoinfuzz

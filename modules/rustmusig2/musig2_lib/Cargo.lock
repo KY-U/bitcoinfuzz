@@ -145,12 +145,11 @@ checksum = "48f5d2a454e16a5ea0f4ced81bd44e4cfc7bd3a507b61887c99fd3538b28e4af"
 
 [[package]]
 name = "musig2"
-version = "0.3.1"
-source = "git+https://github.com/conduition/musig2?rev=ba701af018ac9ed971551ed0e3475b42fdfd62dc#ba701af018ac9ed971551ed0e3475b42fdfd62dc"
+version = "0.4.1"
+source = "git+https://github.com/conduition/musig2?rev=5a09b1197b1b5c621a5a9abc60fa95fa84a1da30#5a09b1197b1b5c621a5a9abc60fa95fa84a1da30"
 dependencies = [
  "base16ct",
  "hmac",
- "once_cell",
  "secp",
  "secp256k1",
  "sha2",
@@ -165,12 +164,6 @@ dependencies = [
  "musig2",
  "secp256k1",
 ]
-
-[[package]]
-name = "once_cell"
-version = "1.21.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "ppv-lite86"
@@ -236,12 +229,11 @@ dependencies = [
 
 [[package]]
 name = "secp"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d3b203895e8f18854c828d1cf7e5710683c3abc28d79330fe5ab723ce5b76e1"
+checksum = "e3ef0ffc3b1b2720b00b919f6c697b1e64aca7bba54b93e0ef4b8560fac6f946"
 dependencies = [
  "base16ct",
- "once_cell",
  "secp256k1",
  "subtle",
 ]
