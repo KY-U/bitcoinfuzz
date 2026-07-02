@@ -128,17 +128,49 @@ LibbitcoinSystem::transaction_eval(std::span<const uint8_t> buffer) const {
 std::optional<std::string>
 LibbitcoinSystem::deserialize_block(std::span<const uint8_t> buffer) const {
   data_chunk data(buffer.begin(), buffer.end());
-  chain::block blk{data, true};
+  chain::block_view blk_view{std::move(data), true};
 
-  // Same rationale as transaction_eval: is_valid() only checks
-  // deserialization. check() applies the consensus-level checks that match
-  // bitcoin core's CheckBlock, so we don't return a hash for blocks the
-  // reference rejects.
+  if (!blk_view.is_valid())
+    return std::nullopt;
+
+  // Checks if block is malleated or merkleroot is invalid.
+  if (blk_view.identify())
+    return "0";
+
+  // Checks witness-commitment under BIP141
+  chain::context ctx{};
+  ctx.flags = chain::flags::bip141_rule;
+  if (blk_view.identify(ctx))
+    return "0";
+
+  // Full object reconstruction after identity checks passed.
+  const data_slice blk_data{buffer.data(), buffer.data() + buffer.size()};
+  chain::block blk{blk_data, true};
+
   if (!blk.is_valid())
     return std::nullopt;
-  if (blk.check())
+
+  // Attach hashes already computed by block_view so block checks do not
+  // recompute them through transaction/header serialization.
+  blk.header_ptr()->set_hash(blk_view.hash());
+
+  const auto &tx_views = blk_view.views();
+  const auto &txs = blk.transactions_ptr();
+  for (size_t i = 0; i < txs->size(); ++i) {
+    const auto &tx = (*txs)[i];
+
+    tx->set_nominal_hash(tx_views[i].hash(true));
+
+    if (tx->is_segregated())
+      tx->set_witness_hash(tx_views[i].hash(true));
+  }
+
+  // Run full block check, skiping identity
+  // checks already performed by block_view.
+  if (blk.check(false))
     return "0";
-  return encode_hash(blk.hash());
+
+  return encode_hash(blk_view.hash());
 }
 
 std::optional<std::string>
