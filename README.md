@@ -138,6 +138,7 @@ contains the module-specific build commands, dependencies, and notes.
 | [Libsecp256k1](https://github.com/bitcoin-core/secp256k1) | `SECP256K1` | [modules/secp256k1/README.md](./modules/secp256k1/README.md) |
 | [NBitcoin-Secp256k1](https://github.com/MetacoSA/NBitcoin/tree/master/NBitcoin.Secp256k1) | `NBITCOIN_SECP256K1` | [modules/nbitcoinsecp256k1/README.md](./modules/nbitcoinsecp256k1/README.md) |
 | [rust-musig2](https://github.com/conduition/rust-musig2) | `RUST_MUSIG2` | [modules/rustmusig2/README.md](./modules/rustmusig2/README.md) |
+| [RustCrypto AES](https://github.com/RustCrypto/block-ciphers/tree/master/aes) | `RUSTCRYPTO_AES` | [modules/rustcryptoaes/README.md](./modules/rustcryptoaes/README.md) |
 
 ### Utreexo Modules
 

@@ -134,6 +134,10 @@ ifneq ($(findstring -DRUST_MUSIG2,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
 	MODULES += modules/rustmusig2/module.a
 endif
 
+ifneq ($(findstring -DRUSTCRYPTO_AES,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
+	MODULES += modules/rustcryptoaes/module.a
+endif
+
 ifeq ($(UNAME_S), Darwin)
 	LDFLAGS = -framework CoreFoundation -Wl,-ld_classic
 endif

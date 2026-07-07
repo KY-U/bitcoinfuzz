@@ -109,6 +109,7 @@ jobs:
           -DBITCOINERLAB_MINISCRIPT \
           -DRUST_PSBT \
           -DRUST_MUSIG2 \
+          -DRUSTCRYPTO_AES \
           -DBTCD \
           -DNBITCOIN \
           -DEMBIT \
@@ -285,6 +286,10 @@ jobs:
           - corpus: "musig2_key_agg"
             target: "musig2_key_agg"
             cxxflags: "-DRUST_MUSIG2 -DSECP256K1"
+            asan_options: "detect_leaks=0:detect_container_overflow=0"
+          - corpus: "aes256_cbc"
+            target: "aes256_cbc"
+            cxxflags: "-DBITCOIN_CORE -DRUSTCRYPTO_AES"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
 
     steps:

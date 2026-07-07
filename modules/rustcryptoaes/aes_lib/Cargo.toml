@@ -1,0 +1,13 @@
+[lib]
+name = "aes_lib"
+crate-type = ["staticlib"]
+
+[package]
+name = "aes_lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aes = "0.9.1"
+cbc = { version = "0.2.1", features = ["alloc", "block-padding"] }
+hex = "0.4.3"

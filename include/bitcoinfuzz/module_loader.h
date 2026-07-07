@@ -149,6 +149,10 @@
 #include <modules/rustmusig2/module.h>
 #endif
 
+#ifdef RUSTCRYPTO_AES
+#include <modules/rustcryptoaes/module.h>
+#endif
+
 #ifdef CUSTOM_MUTATOR_BOLT12_OFFER
 #include <custommutator/mutators/bolt12_offer.h>
 #endif

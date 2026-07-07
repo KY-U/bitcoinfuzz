@@ -447,3 +447,17 @@ services:
       MODULES: ${MODULES:-}
     volumes:
       - ./docker:/app/data
+
+  aes256_cbc:
+    build:
+      context: .
+      tags:
+        - bitcoinfuzz:aes256_cbc
+      args:
+        CXXFLAGS: "-DBITCOIN_CORE -DRUSTCRYPTO_AES"
+        FUZZ: aes256_cbc
+    env_file: .env
+    environment:
+      MODULES: ${MODULES:-}
+    volumes:
+      - ./docker:/app/data
