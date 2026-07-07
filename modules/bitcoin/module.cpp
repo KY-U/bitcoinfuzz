@@ -508,6 +508,50 @@ Bitcoin::addrv2_parse(std::span<const uint8_t> buffer) const {
   return result;
 }
 
+namespace {
+// Computes the BIP-370 "effective" lock time for a PSBT, mirroring the
+// rust-psbt crate's `v2::Psbt::determine_lock_time`. PSBTv0 inputs never
+// carry a required time/height locktime, so for PSBTv0 this always reduces
+// to the fallback locktime taken from the embedded unsigned tx, keeping the
+// output identical to before for PSBTv0 PSBTs.
+std::optional<uint32_t>
+DeterminePSBTLockTime(const PartiallySignedTransaction &psbt) {
+  bool require_time = false;
+  bool require_height = false;
+  bool have_lock_time = false;
+  for (const PSBTInput &input : psbt.inputs) {
+    const bool has_time{input.time_locktime.has_value()};
+    const bool has_height{input.height_locktime.has_value()};
+    if (has_time || has_height) {
+      have_lock_time = true;
+    }
+    if (has_time && !has_height) {
+      require_time = true;
+    }
+    if (has_height && !has_time) {
+      require_height = true;
+    }
+  }
+  // BIP-370: an input requiring a time-based lock time and another
+  // requiring a height-based one is an unsatisfiable combination.
+  if (require_time && require_height) {
+    return std::nullopt;
+  }
+  if (!have_lock_time) {
+    return psbt.fallback_locktime.value_or(0);
+  }
+  std::optional<uint32_t> result;
+  for (const PSBTInput &input : psbt.inputs) {
+    const std::optional<uint32_t> &candidate{
+        require_time ? input.time_locktime : input.height_locktime};
+    if (candidate.has_value()) {
+      result = result.has_value() ? std::max(*result, *candidate) : *candidate;
+    }
+  }
+  return result;
+}
+} // namespace
+
 std::optional<std::string>
 Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
   if (buffer.empty()) {
@@ -526,10 +570,16 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
   try {
     // Extract high-level transaction properties (matching rust-bitcoin format)
     // result += "v=" + std::to_string(tx.version) + ";";
-    const auto lt{psbt.fallback_locktime.has_value()
-                      ? std::to_string(psbt.fallback_locktime.value())
-                      : ""};
-    result += "lt=" + lt + ";";
+    const std::optional<uint32_t> lt{DeterminePSBTLockTime(psbt)};
+    if (!lt.has_value()) {
+      // Conflicting per-input lock time requirements (BIP-370). This is a
+      // well-defined "reject" outcome, not a generic parse failure, so use a
+      // non-empty sentinel (the driver's PSBTParseTarget skips empty results
+      // from comparison entirely) to confirm every module agrees on
+      // rejecting it, mirroring the other PSBTv2-aware modules.
+      return std::string{"CONFLICTING_LOCKTIME"};
+    }
+    result += "lt=" + std::to_string(*lt) + ";";
     result += "in=" + std::to_string(psbt.inputs.size()) + ";";
     result += "out=" + std::to_string(psbt.outputs.size()) + ";";
 
