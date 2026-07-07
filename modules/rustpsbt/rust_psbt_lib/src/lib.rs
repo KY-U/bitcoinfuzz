@@ -2,7 +2,8 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::slice;
 
-use psbt_v2::bitcoin::Psbt;
+use psbt_v2::v0::Psbt as PsbtV0;
+use psbt_v2::v2::Psbt as PsbtV2;
 
 unsafe fn str_to_c_string(input: &str) -> *mut c_char {
     CString::new(input).unwrap().into_raw()
@@ -22,50 +23,216 @@ pub unsafe extern "C" fn rust_psbt_free_c_string(ptr: *mut c_char) {
     }
 }
 
+// Version-agnostic view of the fields the differential fuzz target compares,
+// so PSBTv0 and PSBTv2 psbts are formatted identically (matching the
+// Bitcoin Core module's output format exactly).
+struct InputSummary {
+    prev_txid: String,
+    prev_vout: u32,
+    // `None` when the sequence number is omitted, which can only happen for
+    // PSBTv2 (BIP-370 says it then defaults to the final sequence number).
+    sequence: Option<u32>,
+    has_utxo: bool,
+    sigs: usize,
+}
+
+struct OutputSummary {
+    value: i64,
+    script_hex: String,
+}
+
+fn format_result(lock_time: u32, inputs: &[InputSummary], outputs: &[OutputSummary]) -> String {
+    let mut result = String::new();
+
+    result.push_str(&format!("lt={};", lock_time));
+    result.push_str(&format!("in={};", inputs.len()));
+    result.push_str(&format!("out={};", outputs.len()));
+
+    for (i, input) in inputs.iter().enumerate() {
+        result.push_str(&format!(
+            "in{}prev={}:{};",
+            i, input.prev_txid, input.prev_vout
+        ));
+        let seq = input.sequence.map(|s| s.to_string()).unwrap_or_default();
+        result.push_str(&format!("in{}seq={};", i, seq));
+
+        if input.has_utxo {
+            result.push_str(&format!("in{}utxo=1;", i));
+        }
+
+        result.push_str(&format!("in{}sigs={};", i, input.sigs));
+    }
+
+    for (i, output) in outputs.iter().enumerate() {
+        result.push_str(&format!("out{}val={};", i, output.value));
+        result.push_str(&format!("out{}script={};", i, output.script_hex));
+    }
+
+    result
+}
+
+fn try_parse_v0(data: &[u8]) -> Option<String> {
+    let psbt = PsbtV0::deserialize(data).ok()?;
+
+    // refer: https://github.com/bitcoinfuzz/bitcoinfuzz/issues/134#issuecomment-2884936854 for typecasting
+    let lock_time = psbt.unsigned_tx.lock_time.to_consensus_u32();
+
+    let inputs: Vec<InputSummary> = psbt
+        .unsigned_tx
+        .input
+        .iter()
+        .zip(psbt.inputs.iter())
+        .map(|(txin, psbt_input)| InputSummary {
+            prev_txid: txin.previous_output.txid.to_string(),
+            prev_vout: txin.previous_output.vout,
+            sequence: Some(txin.sequence.0),
+            has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
+            sigs: psbt_input.partial_sigs.len(),
+        })
+        .collect();
+
+    let outputs: Vec<OutputSummary> = psbt
+        .unsigned_tx
+        .output
+        .iter()
+        .map(|output| OutputSummary {
+            value: output.value.to_sat() as i64,
+            script_hex: output.script_pubkey.to_hex_string(),
+        })
+        .collect();
+
+    Some(format_result(lock_time, &inputs, &outputs))
+}
+
+// Minimal CompactSize (Bitcoin's little-endian varint) decoder, returning
+// the decoded value and the number of bytes it occupied.
+fn read_compact_size(data: &[u8]) -> Option<(u64, usize)> {
+    let first = *data.first()?;
+    match first {
+        0..=252 => Some((first as u64, 1)),
+        253 => Some((
+            u16::from_le_bytes(data.get(1..3)?.try_into().ok()?) as u64,
+            3,
+        )),
+        254 => Some((
+            u32::from_le_bytes(data.get(1..5)?.try_into().ok()?) as u64,
+            5,
+        )),
+        255 => Some((u64::from_le_bytes(data.get(1..9)?.try_into().ok()?), 9)),
+    }
+}
+
+fn v2_counts_are_plausible(data: &[u8]) -> bool {
+    const MAGIC: &[u8] = b"psbt\xff";
+    if data.len() < MAGIC.len() || &data[..MAGIC.len()] != MAGIC {
+        return true; // not our concern here; let the real parser reject it
+    }
+
+    let mut offset = MAGIC.len();
+    while offset < data.len() {
+        let Some((keylen, keylen_size)) = read_compact_size(&data[offset..]) else {
+            return true;
+        };
+        offset += keylen_size;
+        if keylen == 0 {
+            return true; // end of the global map
+        }
+        let Some(key_end) = offset
+            .checked_add(keylen as usize)
+            .filter(|&e| e <= data.len())
+        else {
+            return true;
+        };
+        let key = &data[offset..key_end];
+        offset = key_end;
+
+        let Some((vallen, vallen_size)) = read_compact_size(&data[offset..]) else {
+            return true;
+        };
+        offset += vallen_size;
+        let Some(val_end) = offset
+            .checked_add(vallen as usize)
+            .filter(|&e| e <= data.len())
+        else {
+            return true;
+        };
+        let value = &data[offset..val_end];
+        offset = val_end;
+
+        // PSBT_GLOBAL_INPUT_COUNT = 0x04, PSBT_GLOBAL_OUTPUT_COUNT = 0x05
+        // (single-byte key, no key data).
+        if key.len() == 1 && (key[0] == 0x04 || key[0] == 0x05) {
+            if let Some((count, _)) = read_compact_size(value) {
+                if count > data.len() as u64 {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+// Distinguishes a PSBT that isn't a valid PSBTv2 at all (skip: not
+// comparable to other modules) from one that parsed fine but hits the
+// BIP-370 conflicting-lock-time case (compare as an empty result, since
+// that's a well-defined "invalid PSBT" outcome every module should agree
+// on, mirroring the Bitcoin Core module).
+enum TryParseV2Error {
+    Invalid,
+    ConflictingLockTime,
+}
+
+fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
+    if !v2_counts_are_plausible(data) {
+        return Err(TryParseV2Error::Invalid);
+    }
+    let psbt = PsbtV2::deserialize(data).map_err(|_| TryParseV2Error::Invalid)?;
+    let lock_time = psbt
+        .determine_lock_time()
+        .map_err(|_| TryParseV2Error::ConflictingLockTime)?
+        .to_consensus_u32();
+
+    let inputs: Vec<InputSummary> = psbt
+        .inputs
+        .iter()
+        .map(|psbt_input| InputSummary {
+            prev_txid: psbt_input.previous_txid.to_string(),
+            prev_vout: psbt_input.spent_output_index,
+            sequence: psbt_input.sequence.map(|s| s.0),
+            has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
+            sigs: psbt_input.partial_sigs.len(),
+        })
+        .collect();
+
+    let outputs: Vec<OutputSummary> = psbt
+        .outputs
+        .iter()
+        .map(|psbt_output| OutputSummary {
+            value: psbt_output.amount.to_sat() as i64,
+            script_hex: psbt_output.script_pubkey.to_hex_string(),
+        })
+        .collect();
+
+    Ok(format_result(lock_time, &inputs, &outputs))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn rust_psbt_psbt_parse(data: *const u8, len: usize) -> *mut c_char {
     let data_slice = slice::from_raw_parts(data, len);
 
-    match Psbt::deserialize(data_slice) {
-        Ok(psbt) => {
-            let mut result = String::new();
+    if let Some(result) = try_parse_v0(data_slice) {
+        return str_to_c_string(&result);
+    }
 
-            //result.push_str(&format!("v={};", psbt.unsigned_tx.version));
-            result.push_str(&format!("lt={};", psbt.unsigned_tx.lock_time));
-            result.push_str(&format!("in={};", psbt.inputs.len()));
-            result.push_str(&format!("out={};", psbt.outputs.len()));
-            for (i, input) in psbt.unsigned_tx.input.iter().enumerate() {
-                if i < psbt.inputs.len() {
-                    result.push_str(&format!(
-                        "in{}prev={}:{};",
-                        i, input.previous_output.txid, input.previous_output.vout
-                    ));
-                    result.push_str(&format!("in{}seq={};", i, input.sequence));
-
-                    let psbt_input = &psbt.inputs[i];
-
-                    if psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some() {
-                        result.push_str(&format!("in{}utxo=1;", i));
-                    }
-
-                    result.push_str(&format!("in{}sigs={};", i, psbt_input.partial_sigs.len()));
-                }
-            }
-
-            for (i, output) in psbt.unsigned_tx.output.iter().enumerate() {
-                if i < psbt.outputs.len() {
-                    // refer: https://github.com/bitcoinfuzz/bitcoinfuzz/issues/134#issuecomment-2884936854 for typecasting
-                    result.push_str(&format!("out{}val={};", i, output.value.to_sat() as i64));
-                    result.push_str(&format!(
-                        "out{}script={};",
-                        i,
-                        output.script_pubkey.to_hex_string()
-                    ));
-                }
-            }
-
-            str_to_c_string(&result)
-        }
-        Err(_) => std::ptr::null_mut(),
+    match try_parse_v2(data_slice) {
+        Ok(result) => str_to_c_string(&result),
+        // Conflicting per-input lock time requirements (BIP-370) is a
+        // well-defined "reject" outcome, not a generic parse failure. Use a
+        // non-empty sentinel so it's actually compared across modules (the
+        // driver's PSBTParseTarget skips empty results from comparison
+        // entirely) rather than silently opted out, mirroring the other
+        // PSBTv2-aware modules.
+        Err(TryParseV2Error::ConflictingLockTime) => str_to_c_string("CONFLICTING_LOCKTIME"),
+        Err(TryParseV2Error::Invalid) => std::ptr::null_mut(),
     }
 }
