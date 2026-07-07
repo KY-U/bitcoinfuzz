@@ -191,7 +191,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "psbt_parse_clean"
             target: "psbt_parse"
-            cxxflags: "-DBITCOIN_CORE -DRUST_PSBT -DBTCD -DNBITCOIN -DLIBWALLY_CORE -DBITCOINS"
+            cxxflags: "-DBITCOIN_CORE -DRUST_PSBT -DBTCD -DNBITCOIN -DLIBWALLY_CORE -DBITCOINS -DCUSTOM_MUTATOR_PSBT"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
             setup_java: "true"
           - corpus: "kernel_block"

@@ -185,6 +185,10 @@
 #include <custommutator/mutators/schnorr_signature.h>
 #endif
 
+#ifdef CUSTOM_MUTATOR_PSBT
+#include <custommutator/mutators/psbt.h>
+#endif
+
 namespace bitcoinfuzz {
 
 inline void InitializeRegistry() {
@@ -246,6 +250,10 @@ inline void LoadModules([[maybe_unused]] std::shared_ptr<Driver> driver,
 
 #ifdef CUSTOM_MUTATOR_SCHNORR_SIGNATURE
   module_logger.addCustomMutator("Schnorr Signature Custom Mutator");
+#endif
+
+#ifdef CUSTOM_MUTATOR_PSBT
+  module_logger.addCustomMutator("PSBT Custom Mutator");
 #endif
 
   module_logger.logModules();
