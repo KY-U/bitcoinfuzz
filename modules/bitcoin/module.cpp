@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <optional>
 #include <span>
 #include <string>
@@ -11,6 +12,7 @@ const TranslateFn G_TRANSLATION_FUN{nullptr};
 #include "consensus/tx_check.h"
 #include "consensus/validation.h"
 #include "core_io.h"
+#include "crypto/aes.h"
 #include "descriptor.h"
 #include "key.h"
 #include "key_io.h"
@@ -750,6 +752,45 @@ Bitcoin::bip32_derive_from_path(std::span<const uint8_t> buffer) const {
   }
 
   return EncodeExtKey(key);
+}
+
+std::optional<std::string>
+Bitcoin::aes256_cbc(std::span<const uint8_t> key, std::span<const uint8_t> iv,
+                    bool pad, std::span<const uint8_t> data) const {
+  const int size = static_cast<int>(data.size());
+
+  const AES256CBCEncrypt enc(key.data(), iv.data(), pad);
+  std::vector<uint8_t> ciphertext(data.size() + AES_BLOCKSIZE);
+  const int enc_written = enc.Encrypt(data.data(), size, ciphertext.data());
+  const std::string enc_res =
+      enc_written == 0 ? "ERR"
+                       : HexStr(std::span{ciphertext.data(),
+                                          static_cast<size_t>(enc_written)});
+
+  const AES256CBCDecrypt dec(key.data(), iv.data(), pad);
+  std::vector<uint8_t> plaintext(data.size());
+  const int dec_written = dec.Decrypt(data.data(), size, plaintext.data());
+  std::string dec_res;
+  if (dec_written > 0) {
+    dec_res =
+        HexStr(std::span{plaintext.data(), static_cast<size_t>(dec_written)});
+  } else if (pad && size == AES_BLOCKSIZE) {
+    // Decrypt() returns 0 both for invalid padding and for the legitimate
+    // empty plaintext (a single block of full PKCS#7 padding). Disambiguate
+    // with a raw decryption of the block.
+    const AES256CBCDecrypt raw_dec(key.data(), iv.data(), /*padIn=*/false);
+    const int raw_written =
+        raw_dec.Decrypt(data.data(), size, plaintext.data());
+    const bool full_padding =
+        raw_written == AES_BLOCKSIZE &&
+        std::all_of(plaintext.begin(), plaintext.begin() + AES_BLOCKSIZE,
+                    [](uint8_t byte) { return byte == AES_BLOCKSIZE; });
+    dec_res = full_padding ? "" : "ERR";
+  } else {
+    dec_res = "ERR";
+  }
+
+  return "enc=" + enc_res + " dec=" + dec_res;
 }
 
 } // namespace module

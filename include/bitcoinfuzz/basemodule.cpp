@@ -177,4 +177,11 @@ BaseModule::musig2_key_agg(std::span<const uint8_t> /*seckeys*/) const {
   return std::nullopt;
 }
 
+std::optional<std::string>
+BaseModule::aes256_cbc(std::span<const uint8_t> /*key*/,
+                       std::span<const uint8_t> /*iv*/, bool /*pad*/,
+                       std::span<const uint8_t> /*data*/) const {
+  return std::nullopt;
+}
+
 } // namespace bitcoinfuzz
