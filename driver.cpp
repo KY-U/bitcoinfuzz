@@ -9,6 +9,7 @@
 #include "driver.h"
 #include <bitcoinfuzz/basemodule.h>
 #include <bitcoinfuzz/module_registry.h>
+#include <bitcoinfuzz/util.h>
 
 namespace bitcoinfuzz {
 template <typename T>
@@ -777,8 +778,8 @@ void Driver::Aes256CbcTarget(std::span<const uint8_t> buffer) const {
   if (buffer.size() < 50)
     return;
 
-  std::vector<uint8_t> key = provider.ConsumeBytes<uint8_t>(32);
-  std::vector<uint8_t> iv = provider.ConsumeBytes<uint8_t>(16);
+  std::vector<uint8_t> key = ConsumeFixedLengthByteVector(provider, 32);
+  std::vector<uint8_t> iv = ConsumeFixedLengthByteVector(provider, 16);
   const bool pad = provider.ConsumeBool();
   std::vector<uint8_t> data = provider.ConsumeRemainingBytes<uint8_t>();
   if (data.empty())
