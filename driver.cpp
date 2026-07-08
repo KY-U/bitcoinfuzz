@@ -114,19 +114,18 @@ void Driver::VerifyScriptTarget(std::span<const uint8_t> buffer) const {
   std::vector<uint8_t> script_pubkey = provider.ConsumeBytes<uint8_t>(
       provider.ConsumeIntegralInRange<size_t>(0, 1024));
 
-  // Skip these opcodes only for implementations that disagree with Core's
-  // FindAndDelete handling, while continuing to compare all other modules.
-  auto opcodes_to_skip = [](unsigned char op) {
-    return op >= 0xAC && op <= 0xAF;
-  };
-  bool has_opcode_mismatch =
-      std::ranges::any_of(script_sig, opcodes_to_skip) ||
-      std::ranges::any_of(script_pubkey, opcodes_to_skip);
-
   std::optional<bool> last_response{std::nullopt};
   std::string last_module_name;
   for (auto &module : modules) {
 #if defined(BTCD) || defined(GOCOIN)
+    // Skip these opcodes only for implementations that disagree with Core's
+    // FindAndDelete handling, while continuing to compare all other modules.
+    auto opcodes_to_skip = [](unsigned char op) {
+      return op >= 0xAC && op <= 0xAF;
+    };
+    bool has_opcode_mismatch =
+        std::ranges::any_of(script_sig, opcodes_to_skip) ||
+        std::ranges::any_of(script_pubkey, opcodes_to_skip);
     if (has_opcode_mismatch &&
         (module.first == "Btcd" || module.first == "Gocoin"))
       continue;
