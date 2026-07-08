@@ -9,6 +9,7 @@
 #include "driver.h"
 #include <bitcoinfuzz/basemodule.h>
 #include <bitcoinfuzz/module_registry.h>
+#include <bitcoinfuzz/util.h>
 
 namespace bitcoinfuzz {
 template <typename T>
@@ -113,19 +114,18 @@ void Driver::VerifyScriptTarget(std::span<const uint8_t> buffer) const {
   std::vector<uint8_t> script_pubkey = provider.ConsumeBytes<uint8_t>(
       provider.ConsumeIntegralInRange<size_t>(0, 1024));
 
-  // Skip these opcodes only for implementations that disagree with Core's
-  // FindAndDelete handling, while continuing to compare all other modules.
-  auto opcodes_to_skip = [](unsigned char op) {
-    return op >= 0xAC && op <= 0xAF;
-  };
-  bool has_opcode_mismatch =
-      std::ranges::any_of(script_sig, opcodes_to_skip) ||
-      std::ranges::any_of(script_pubkey, opcodes_to_skip);
-
   std::optional<bool> last_response{std::nullopt};
   std::string last_module_name;
   for (auto &module : modules) {
 #if defined(BTCD) || defined(GOCOIN)
+    // Skip these opcodes only for implementations that disagree with Core's
+    // FindAndDelete handling, while continuing to compare all other modules.
+    auto opcodes_to_skip = [](unsigned char op) {
+      return op >= 0xAC && op <= 0xAF;
+    };
+    bool has_opcode_mismatch =
+        std::ranges::any_of(script_sig, opcodes_to_skip) ||
+        std::ranges::any_of(script_pubkey, opcodes_to_skip);
     if (has_opcode_mismatch &&
         (module.first == "Btcd" || module.first == "Gocoin"))
       continue;
@@ -769,6 +769,35 @@ void Driver::Musig2KeyAggTarget(std::span<const uint8_t> buffer) const {
   }
 }
 
+void Driver::Aes256CbcTarget(std::span<const uint8_t> buffer) const {
+  FuzzedDataProvider provider(buffer.data(), buffer.size());
+  // key(32) + iv(16) + pad flag(1) + at least one data byte. Empty data is
+  // excluded because Bitcoin Core's CBC routines reject it while other
+  // implementations accept it, which is not an interesting difference.
+  if (buffer.size() < 50)
+    return;
+
+  std::vector<uint8_t> key = ConsumeFixedLengthByteVector(provider, 32);
+  std::vector<uint8_t> iv = ConsumeFixedLengthByteVector(provider, 16);
+  const bool pad = provider.ConsumeBool();
+  std::vector<uint8_t> data = provider.ConsumeRemainingBytes<uint8_t>();
+  if (data.empty())
+    return;
+
+  std::optional<std::string> last_response{std::nullopt};
+  std::string last_module_name;
+
+  for (auto &module : modules) {
+    std::optional<std::string> res{
+        module.second->aes256_cbc(key, iv, pad, data)};
+    if (!res.has_value())
+      continue;
+
+    VerifyMatchingResponse(last_response, last_module_name, module.first, *res,
+                           "AES256-CBC Target failed");
+  }
+}
+
 void Driver::Run(const uint8_t *data, const size_t size,
                  const std::string &target) const {
   std::span<const uint8_t> buffer{data, size};
@@ -836,6 +865,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->Bip32DeriveFromPathTarget(buffer);
   } else if (target == "musig2_key_agg") {
     this->Musig2KeyAggTarget(buffer);
+  } else if (target == "aes256_cbc") {
+    this->Aes256CbcTarget(buffer);
   } else {
     std::cout << "Unknown target: " << target << std::endl;
     assert(false);
