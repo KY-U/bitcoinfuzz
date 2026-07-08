@@ -8,6 +8,188 @@ namespace NBitcoin.CppBridge;
 
 public static class Bridge
 {
+    // Minimal, self-contained CompactSize (Bitcoin's little-endian varint)
+    // decoder operating directly on the raw PSBT bytes. Used only to
+    // disambiguate PSBT_IN_SEQUENCE presence (see V2InputHasExplicitSequence
+    // below); everything else about the parse is handled by NBitcoin itself.
+    private static bool TryReadCompactSize(byte[] data, int offset, out ulong value, out int bytesRead)
+    {
+        value = 0;
+        bytesRead = 0;
+        if (offset >= data.Length)
+        {
+            return false;
+        }
+
+        byte first = data[offset];
+        if (first < 253)
+        {
+            value = first;
+            bytesRead = 1;
+            return true;
+        }
+        if (first == 253)
+        {
+            if (offset + 3 > data.Length)
+            {
+                return false;
+            }
+            ushort v = (ushort)(data[offset + 1] | (data[offset + 2] << 8));
+            if (v < 253)
+            {
+                return false; // non-canonical
+            }
+            value = v;
+            bytesRead = 3;
+            return true;
+        }
+        if (first == 254)
+        {
+            if (offset + 5 > data.Length)
+            {
+                return false;
+            }
+            uint v = (uint)(data[offset + 1] | (data[offset + 2] << 8) |
+                            (data[offset + 3] << 16) | (data[offset + 4] << 24));
+            if (v < 0x10000u)
+            {
+                return false; // non-canonical
+            }
+            value = v;
+            bytesRead = 5;
+            return true;
+        }
+
+        if (offset + 9 > data.Length)
+        {
+            return false;
+        }
+        ulong v64 = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            v64 |= (ulong)data[offset + 1 + i] << (8 * i);
+        }
+        if (v64 < 0x100000000UL)
+        {
+            return false; // non-canonical
+        }
+        value = v64;
+        bytesRead = 9;
+        return true;
+    }
+
+    // Advances `offset` past one PSBT key-value map (a run of records
+    // terminated by a zero-length key). Returns false if the buffer is
+    // malformed/truncated before reaching the terminator.
+    private static bool TrySkipPsbtMap(byte[] data, ref int offset)
+    {
+        while (true)
+        {
+            if (offset > data.Length || !TryReadCompactSize(data, offset, out ulong keylen, out int keylenSize))
+            {
+                return false;
+            }
+            offset += keylenSize;
+            if (keylen == 0)
+            {
+                return true; // separator
+            }
+            if ((ulong)(data.Length - offset) < keylen)
+            {
+                return false;
+            }
+            offset += (int)keylen;
+
+            if (!TryReadCompactSize(data, offset, out ulong vallen, out int vallenSize))
+            {
+                return false;
+            }
+            offset += vallenSize;
+            if ((ulong)(data.Length - offset) < vallen)
+            {
+                return false;
+            }
+            offset += (int)vallen;
+        }
+    }
+
+    // Scans the map starting at `offset` (advancing it past the map) for a
+    // record whose key is the single byte `keyType` with no key data.
+    private static bool PsbtMapHasSingleByteKey(byte[] data, ref int offset, byte keyType)
+    {
+        bool found = false;
+        while (true)
+        {
+            if (offset > data.Length || !TryReadCompactSize(data, offset, out ulong keylen, out int keylenSize))
+            {
+                return false;
+            }
+            offset += keylenSize;
+            if (keylen == 0)
+            {
+                return found; // separator
+            }
+            if ((ulong)(data.Length - offset) < keylen)
+            {
+                return false;
+            }
+            if (keylen == 1 && data[offset] == keyType)
+            {
+                found = true;
+            }
+            offset += (int)keylen;
+
+            if (!TryReadCompactSize(data, offset, out ulong vallen, out int vallenSize))
+            {
+                return false;
+            }
+            offset += vallenSize;
+            if ((ulong)(data.Length - offset) < vallen)
+            {
+                return false;
+            }
+            offset += (int)vallen;
+        }
+    }
+
+    private const byte PsbtInSequenceKey = 0x10;
+
+    // NBitcoin's Sequence is a plain (non-nullable) value, so an omitted
+    // PSBT_IN_SEQUENCE and an explicit one equal to Sequence.Final both
+    // read back as the same concrete value. Bitcoin Core/rust-psbt/
+    // libwallycore format an *omitted* sequence as an empty string, so
+    // match that here only for the ambiguous case by re-scanning the raw
+    // input map for an explicit PSBT_IN_SEQUENCE record.
+    private static bool V2InputHasExplicitSequence(byte[] psbtBytes, int targetInputIndex)
+    {
+        byte[] magic = { 0x70, 0x73, 0x62, 0x74, 0xff };
+        if (psbtBytes.Length < magic.Length)
+        {
+            return false;
+        }
+        for (int i = 0; i < magic.Length; i++)
+        {
+            if (psbtBytes[i] != magic[i])
+            {
+                return false;
+            }
+        }
+
+        int offset = magic.Length;
+        if (!TrySkipPsbtMap(psbtBytes, ref offset))
+        {
+            return false; // global map
+        }
+        for (int i = 0; i < targetInputIndex; i++)
+        {
+            if (!TrySkipPsbtMap(psbtBytes, ref offset))
+            {
+                return false;
+            }
+        }
+        return PsbtMapHasSingleByteKey(psbtBytes, ref offset, PsbtInSequenceKey);
+    }
+
     [UnmanagedCallersOnly(EntryPoint = "nbitcoin_psbt_parse")]
     public static IntPtr PsbtParse(IntPtr dataPtr, UIntPtr len)
     {
@@ -22,8 +204,23 @@ public static class Bridge
             Marshal.Copy(dataPtr, psbtBytes, 0, (int)len);
 
             PSBT psbt = PSBT.Load(psbtBytes, Network.Main);
+            bool isV2 = psbt.Version == PSBTVersion.PSBTv2;
 
-            var tx = psbt.GetGlobalTransaction();
+            Transaction tx;
+            try
+            {
+                tx = psbt.GetGlobalTransaction();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("conflicting", StringComparison.OrdinalIgnoreCase))
+            {
+                // Conflicting per-input lock time requirements (BIP-370) is a
+                // well-defined "reject" outcome, not a generic parse failure.
+                // Use a non-empty sentinel so it's actually compared across
+                // modules (the driver's PSBTParseTarget skips empty results
+                // from comparison entirely) rather than silently opted out,
+                // mirroring the other PSBTv2-aware modules.
+                return Marshal.StringToHGlobalAnsi("CONFLICTING_LOCKTIME");
+            }
             if (tx == null)
             {
                 return Marshal.StringToHGlobalAnsi("");
@@ -39,7 +236,16 @@ public static class Bridge
                 var txIn = tx.Inputs[i];
 
                 result.Append($"in{i}prev={txIn.PrevOut.Hash}:{txIn.PrevOut.N};");
-                result.Append($"in{i}seq={txIn.Sequence.Value};");
+
+                uint seqValue = txIn.Sequence.Value;
+                if (!isV2 || seqValue != Sequence.Final.Value || V2InputHasExplicitSequence(psbtBytes, i))
+                {
+                    result.Append($"in{i}seq={seqValue};");
+                }
+                else
+                {
+                    result.Append($"in{i}seq=;");
+                }
 
                 if (i < psbt.Inputs.Count)
                 {
