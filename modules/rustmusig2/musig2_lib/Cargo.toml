@@ -9,5 +9,5 @@ edition = "2021"
 
 [dependencies]
 hex = "0.4.3"
-musig2 = { git = "https://github.com/conduition/musig2", rev = "ba701af018ac9ed971551ed0e3475b42fdfd62dc", features = ["secp256k1"] }
+musig2 = { git = "https://github.com/conduition/musig2", rev = "5a09b1197b1b5c621a5a9abc60fa95fa84a1da30", features = ["secp256k1"] }
 secp256k1 = "0.31"

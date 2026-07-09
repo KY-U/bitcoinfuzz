@@ -754,18 +754,52 @@ void Driver::Musig2KeyAggTarget(std::span<const uint8_t> buffer) const {
     std::optional<std::string> res{module.second->musig2_key_agg(seckeys)};
     if (!res.has_value())
       continue;
-    if (last_response.has_value()) {
-      if (*res != *last_response) {
-        std::cout << "MuSig2 Key Aggregation failed" << std::endl;
-        std::cout << "Module: " << module.first << std::endl;
-        std::cout << "Result: " << *res << std::endl;
-        std::cout << "Module: " << last_module_name << std::endl;
-        std::cout << "Result: " << *last_response << std::endl;
-      }
-      assert(*res == *last_response);
-    }
-    last_response = res.value();
-    last_module_name = module.first;
+    VerifyMatchingResponse(last_response, last_module_name, module.first, *res,
+                           "MuSig2 Key Aggregation failed");
+  }
+}
+
+void Driver::Musig2SignSessionTarget(std::span<const uint8_t> buffer) const {
+  FuzzedDataProvider provider(buffer.data(), buffer.size());
+  const size_t num_keys = provider.ConsumeIntegralInRange<size_t>(1, 6);
+
+  Musig2SignSessionInput input;
+  input.seckeys = provider.ConsumeBytes<uint8_t>(num_keys * 32);
+  input.msg32 = provider.ConsumeBytes<uint8_t>(32);
+  input.nonce_seeds = provider.ConsumeBytes<uint8_t>(num_keys * 32);
+  if (input.seckeys.size() != num_keys * 32 || input.msg32.size() != 32 ||
+      input.nonce_seeds.size() != num_keys * 32) {
+    return;
+  }
+
+  input.use_extra_input = provider.ConsumeBool();
+  if (input.use_extra_input) {
+    input.extra_input = provider.ConsumeBytes<uint8_t>(32);
+    if (input.extra_input.size() != 32)
+      return;
+  }
+
+  // Chained tweaks in fuzzer-chosen type and order.
+  const size_t num_tweaks = provider.ConsumeIntegralInRange<size_t>(0, 4);
+  for (size_t i = 0; i < num_tweaks; ++i) {
+    Musig2Tweak tweak;
+    tweak.is_xonly = provider.ConsumeBool();
+    const std::vector<uint8_t> tweak_bytes = provider.ConsumeBytes<uint8_t>(32);
+    if (tweak_bytes.size() != 32)
+      return;
+    std::copy(tweak_bytes.begin(), tweak_bytes.end(), tweak.tweak.begin());
+    input.tweaks.push_back(tweak);
+  }
+
+  std::optional<std::string> last_response{std::nullopt};
+  std::string last_module_name;
+
+  for (auto &module : modules) {
+    std::optional<std::string> res{module.second->musig2_sign_session(input)};
+    if (!res.has_value())
+      continue;
+    VerifyMatchingResponse(last_response, last_module_name, module.first, *res,
+                           "MuSig2 signing session failed");
   }
 }
 
@@ -867,6 +901,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->Musig2KeyAggTarget(buffer);
   } else if (target == "aes256_cbc") {
     this->Aes256CbcTarget(buffer);
+  } else if (target == "musig2_sign_session") {
+    this->Musig2SignSessionTarget(buffer);
   } else {
     std::cout << "Unknown target: " << target << std::endl;
     assert(false);
