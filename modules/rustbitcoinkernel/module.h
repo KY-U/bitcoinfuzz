@@ -15,6 +15,8 @@ public:
   kernel_block(std::span<const uint8_t> buffer) const override;
   std::optional<std::string>
   kernel_transaction(std::span<const uint8_t> buffer) const override;
+  std::optional<std::string>
+  kernel_block_check(std::span<const uint8_t> buffer) const override;
   ~Rustbitcoinkernel() noexcept override = default;
 };
 
