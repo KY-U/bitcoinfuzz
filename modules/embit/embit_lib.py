@@ -47,16 +47,13 @@ def psbt_parse(data):
             # check utxo
             psbt_input = psbt_obj.inputs[i]
             has_utxo = (
-                1
-                if (
-                    hasattr(psbt_input, "witness_utxo")
-                    and psbt_input.witness_utxo is not None
-                    or hasattr(psbt_input, "non_witness_utxo")
-                    and psbt_input.non_witness_utxo is not None
-                )
-                else 0
+                hasattr(psbt_input, "witness_utxo")
+                and psbt_input.witness_utxo is not None
+                or hasattr(psbt_input, "non_witness_utxo")
+                and psbt_input.non_witness_utxo is not None
             )
-            result.append(f"in{i}utxo={has_utxo}")
+            if has_utxo:
+                result.append(f"in{i}utxo=1")
 
             # count sig
             sig_count = (
@@ -68,7 +65,7 @@ def psbt_parse(data):
 
         for i, vout in enumerate(tx.vout):
             result.append(f"out{i}val={vout.value}")
-            result.append(f"out{i}script={vout.scriptpubkey.hex()}")
+            result.append(f"out{i}script={vout.script_pubkey.data.hex()}")
 
         return ";".join(result) + ";"
     except Exception as _:
