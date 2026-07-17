@@ -34,11 +34,20 @@ struct InputSummary {
     sequence: Option<u32>,
     has_utxo: bool,
     sigs: usize,
+    redeem_script_hex: String,
+    witness_script_hex: String,
+    // Raw PSBT_IN_SIGHASH_TYPE byte value, or 0 if unset.
+    sighash: u32,
+    bip32_count: usize,
+    finalized: bool,
 }
 
 struct OutputSummary {
     value: i64,
     script_hex: String,
+    redeem_script_hex: String,
+    witness_script_hex: String,
+    bip32_count: usize,
 }
 
 fn format_result(lock_time: u32, inputs: &[InputSummary], outputs: &[OutputSummary]) -> String {
@@ -61,11 +70,21 @@ fn format_result(lock_time: u32, inputs: &[InputSummary], outputs: &[OutputSumma
         }
 
         result.push_str(&format!("in{}sigs={};", i, input.sigs));
+        result.push_str(&format!("in{}rs={};", i, input.redeem_script_hex));
+        result.push_str(&format!("in{}ws={};", i, input.witness_script_hex));
+        result.push_str(&format!("in{}sh={};", i, input.sighash));
+        result.push_str(&format!("in{}bip32={};", i, input.bip32_count));
+        if input.finalized {
+            result.push_str(&format!("in{}fin=1;", i));
+        }
     }
 
     for (i, output) in outputs.iter().enumerate() {
         result.push_str(&format!("out{}val={};", i, output.value));
         result.push_str(&format!("out{}script={};", i, output.script_hex));
+        result.push_str(&format!("out{}rs={};", i, output.redeem_script_hex));
+        result.push_str(&format!("out{}ws={};", i, output.witness_script_hex));
+        result.push_str(&format!("out{}bip32={};", i, output.bip32_count));
     }
 
     result
@@ -88,6 +107,20 @@ fn try_parse_v0(data: &[u8]) -> Option<String> {
             sequence: Some(txin.sequence.0),
             has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
             sigs: psbt_input.partial_sigs.len(),
+            redeem_script_hex: psbt_input
+                .redeem_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            witness_script_hex: psbt_input
+                .witness_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
+            bip32_count: psbt_input.bip32_derivation.len(),
+            finalized: psbt_input.final_script_sig.is_some()
+                || psbt_input.final_script_witness.is_some(),
         })
         .collect();
 
@@ -95,9 +128,21 @@ fn try_parse_v0(data: &[u8]) -> Option<String> {
         .unsigned_tx
         .output
         .iter()
-        .map(|output| OutputSummary {
+        .zip(psbt.outputs.iter())
+        .map(|(output, psbt_output)| OutputSummary {
             value: output.value.to_sat() as i64,
             script_hex: output.script_pubkey.to_hex_string(),
+            redeem_script_hex: psbt_output
+                .redeem_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            witness_script_hex: psbt_output
+                .witness_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            bip32_count: psbt_output.bip32_derivation.len(),
         })
         .collect();
 
@@ -201,6 +246,20 @@ fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
             sequence: psbt_input.sequence.map(|s| s.0),
             has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
             sigs: psbt_input.partial_sigs.len(),
+            redeem_script_hex: psbt_input
+                .redeem_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            witness_script_hex: psbt_input
+                .witness_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
+            bip32_count: psbt_input.bip32_derivations.len(),
+            finalized: psbt_input.final_script_sig.is_some()
+                || psbt_input.final_script_witness.is_some(),
         })
         .collect();
 
@@ -210,6 +269,17 @@ fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
         .map(|psbt_output| OutputSummary {
             value: psbt_output.amount.to_sat() as i64,
             script_hex: psbt_output.script_pubkey.to_hex_string(),
+            redeem_script_hex: psbt_output
+                .redeem_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            witness_script_hex: psbt_output
+                .witness_script
+                .as_ref()
+                .map(|s| s.to_hex_string())
+                .unwrap_or_default(),
+            bip32_count: psbt_output.bip32_derivations.len(),
         })
         .collect();
 

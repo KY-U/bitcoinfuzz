@@ -299,6 +299,21 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 			// count partial sig
 			sigCount := len(packet.Inputs[i].PartialSigs)
 			result.WriteString(fmt.Sprintf("in%dsigs=%d;", i, sigCount))
+
+			// redeem/witness scripts as hex (empty if absent)
+			result.WriteString(fmt.Sprintf("in%drs=%x;", i, packet.Inputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("in%dws=%x;", i, packet.Inputs[i].WitnessScript))
+
+			// sighash type (0 if unset)
+			result.WriteString(fmt.Sprintf("in%dsh=%d;", i, uint32(packet.Inputs[i].SighashType)))
+
+			// BIP32 derivation count
+			result.WriteString(fmt.Sprintf("in%dbip32=%d;", i, len(packet.Inputs[i].Bip32Derivation)))
+
+			// finalized status
+			if len(packet.Inputs[i].FinalScriptSig) > 0 || len(packet.Inputs[i].FinalScriptWitness) > 0 {
+				result.WriteString(fmt.Sprintf("in%dfin=1;", i))
+			}
 		}
 	}
 
@@ -308,6 +323,13 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 			result.WriteString(fmt.Sprintf("out%dval=%d;", i, txOut.Value))
 			scriptHex := fmt.Sprintf("%x", txOut.PkScript) // script pubkey as hex
 			result.WriteString(fmt.Sprintf("out%dscript=%s;", i, scriptHex))
+
+			// redeem/witness scripts as hex (empty if absent)
+			result.WriteString(fmt.Sprintf("out%drs=%x;", i, packet.Outputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("out%dws=%x;", i, packet.Outputs[i].WitnessScript))
+
+			// BIP32 derivation count
+			result.WriteString(fmt.Sprintf("out%dbip32=%d;", i, len(packet.Outputs[i].Bip32Derivation)))
 		}
 	}
 

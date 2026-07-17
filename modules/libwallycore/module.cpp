@@ -270,6 +270,29 @@ std::optional<uint32_t> DetermineV2LockTime(const struct wally_psbt *psbt) {
   }
   return result;
 }
+
+// BIP-174 keytypes for redeem/witness scripts. Unlike Bitcoin Core/rust-psbt,
+// libwally doesn't expose these as dedicated struct fields on
+// wally_psbt_input/wally_psbt_output; they live in the generic per-field map
+// (`psbt_fields`), keyed by these values (see
+// external/libwally-core/src/psbt_io.h).
+constexpr uint32_t PSBT_IN_REDEEM_SCRIPT_KT = 0x04;
+constexpr uint32_t PSBT_IN_WITNESS_SCRIPT_KT = 0x05;
+constexpr uint32_t PSBT_OUT_REDEEM_SCRIPT_KT = 0x00;
+constexpr uint32_t PSBT_OUT_WITNESS_SCRIPT_KT = 0x01;
+
+// Returns the hex-encoded value stored under `keytype` in `fields`, or an
+// empty string if absent.
+std::string GetMapFieldHex(const wally_map &fields, uint32_t keytype) {
+  const wally_map_item *item = wally_map_get_integer(&fields, keytype);
+  if (!item || item->value_len == 0) {
+    return std::string{};
+  }
+  std::vector<char> hex(item->value_len * 2 + 1);
+  bool ok = hex_encode(item->value, item->value_len, hex.data(), hex.size());
+  assert(ok);
+  return std::string(hex.data());
+}
 } // namespace
 
 namespace bitcoinfuzz {
@@ -315,6 +338,23 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
 
         result << "in" << i << "sigs=" << psbt_input.signatures.num_items
                << ";";
+
+        result << "in" << i << "rs="
+               << GetMapFieldHex(psbt_input.psbt_fields,
+                                 PSBT_IN_REDEEM_SCRIPT_KT)
+               << ";";
+        result << "in" << i << "ws="
+               << GetMapFieldHex(psbt_input.psbt_fields,
+                                 PSBT_IN_WITNESS_SCRIPT_KT)
+               << ";";
+        result << "in" << i << "sh=" << psbt_input.sighash << ";";
+        result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
+
+        size_t finalized = 0;
+        wally_psbt_input_is_finalized(&psbt_input, &finalized);
+        if (finalized) {
+          result << "in" << i << "fin=1;";
+        }
       }
     }
 
@@ -334,6 +374,20 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       result << "out" << i << "val=" << static_cast<int64_t>(txout.satoshi)
              << ";";
       result << "out" << i << "script=" << script_hex.data() << ";";
+
+      if (i < psbt->num_outputs) {
+        const wally_psbt_output &psbt_output = psbt->outputs[i];
+        result << "out" << i << "rs="
+               << GetMapFieldHex(psbt_output.psbt_fields,
+                                 PSBT_OUT_REDEEM_SCRIPT_KT)
+               << ";";
+        result << "out" << i << "ws="
+               << GetMapFieldHex(psbt_output.psbt_fields,
+                                 PSBT_OUT_WITNESS_SCRIPT_KT)
+               << ";";
+        result << "out" << i << "bip32=" << psbt_output.keypaths.num_items
+               << ";";
+      }
     }
   } else {
     // PSBTv2 (BIP-370): tx data is per-input/output instead of a global
@@ -379,6 +433,22 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       }
 
       result << "in" << i << "sigs=" << psbt_input.signatures.num_items << ";";
+
+      result << "in" << i << "rs="
+             << GetMapFieldHex(psbt_input.psbt_fields, PSBT_IN_REDEEM_SCRIPT_KT)
+             << ";";
+      result << "in" << i << "ws="
+             << GetMapFieldHex(psbt_input.psbt_fields,
+                               PSBT_IN_WITNESS_SCRIPT_KT)
+             << ";";
+      result << "in" << i << "sh=" << psbt_input.sighash << ";";
+      result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
+
+      size_t finalized = 0;
+      wally_psbt_input_is_finalized(&psbt_input, &finalized);
+      if (finalized) {
+        result << "in" << i << "fin=1;";
+      }
     }
 
     for (size_t i = 0; i < psbt->num_outputs; i++) {
@@ -394,6 +464,16 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
                                                             : 0)
              << ";";
       result << "out" << i << "script=" << script_hex.data() << ";";
+
+      result << "out" << i << "rs="
+             << GetMapFieldHex(psbt_output.psbt_fields,
+                               PSBT_OUT_REDEEM_SCRIPT_KT)
+             << ";";
+      result << "out" << i << "ws="
+             << GetMapFieldHex(psbt_output.psbt_fields,
+                               PSBT_OUT_WITNESS_SCRIPT_KT)
+             << ";";
+      result << "out" << i << "bip32=" << psbt_output.keypaths.num_items << ";";
     }
   }
 

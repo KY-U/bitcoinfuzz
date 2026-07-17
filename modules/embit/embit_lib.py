@@ -63,9 +63,55 @@ def psbt_parse(data):
             )
             result.append(f"in{i}sigs={sig_count}")
 
+            redeem_script_hex = (
+                psbt_input.redeem_script.data.hex()
+                if psbt_input.redeem_script is not None
+                else ""
+            )
+            result.append(f"in{i}rs={redeem_script_hex}")
+
+            witness_script_hex = (
+                psbt_input.witness_script.data.hex()
+                if psbt_input.witness_script is not None
+                else ""
+            )
+            result.append(f"in{i}ws={witness_script_hex}")
+
+            # raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset
+            sighash = (
+                psbt_input.sighash_type if psbt_input.sighash_type is not None else 0
+            )
+            result.append(f"in{i}sh={sighash}")
+
+            result.append(f"in{i}bip32={len(psbt_input.bip32_derivations)}")
+
+            if (
+                psbt_input.final_scriptsig is not None
+                or psbt_input.final_scriptwitness is not None
+            ):
+                result.append(f"in{i}fin=1")
+
         for i, vout in enumerate(tx.vout):
             result.append(f"out{i}val={vout.value}")
             result.append(f"out{i}script={vout.script_pubkey.data.hex()}")
+
+            psbt_output = psbt_obj.outputs[i]
+
+            redeem_script_hex = (
+                psbt_output.redeem_script.data.hex()
+                if psbt_output.redeem_script is not None
+                else ""
+            )
+            result.append(f"out{i}rs={redeem_script_hex}")
+
+            witness_script_hex = (
+                psbt_output.witness_script.data.hex()
+                if psbt_output.witness_script is not None
+                else ""
+            )
+            result.append(f"out{i}ws={witness_script_hex}")
+
+            result.append(f"out{i}bip32={len(psbt_output.bip32_derivations)}")
 
         return ";".join(result) + ";"
     except Exception as _:

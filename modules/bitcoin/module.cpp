@@ -610,6 +610,28 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
       // Partial signatures count
       result += "in" + std::to_string(i) +
                 "sigs=" + std::to_string(psbt_input.partial_sigs.size()) + ";";
+
+      // Redeem/witness scripts as hex
+      result += "in" + std::to_string(i) +
+                "rs=" + HexStr(psbt_input.redeem_script) + ";";
+      result += "in" + std::to_string(i) +
+                "ws=" + HexStr(psbt_input.witness_script) + ";";
+
+      // Sighash type (0 if unset)
+      result += "in" + std::to_string(i) + "sh=" +
+                std::to_string(static_cast<uint32_t>(
+                    psbt_input.sighash_type.value_or(0))) +
+                ";";
+
+      // BIP32 derivation count
+      result += "in" + std::to_string(i) +
+                "bip32=" + std::to_string(psbt_input.hd_keypaths.size()) + ";";
+
+      // Finalized status
+      if (!psbt_input.final_script_sig.empty() ||
+          !psbt_input.final_script_witness.IsNull()) {
+        result += "in" + std::to_string(i) + "fin=1;";
+      }
     }
 
     // Extract output information
@@ -623,6 +645,16 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
       // Output script as hex string
       result += "out" + std::to_string(i) +
                 "script=" + HexStr(psbt_output.script) + ";";
+
+      // Redeem/witness scripts as hex
+      result += "out" + std::to_string(i) +
+                "rs=" + HexStr(psbt_output.redeem_script) + ";";
+      result += "out" + std::to_string(i) +
+                "ws=" + HexStr(psbt_output.witness_script) + ";";
+
+      // BIP32 derivation count
+      result += "out" + std::to_string(i) +
+                "bip32=" + std::to_string(psbt_output.hd_keypaths.size()) + ";";
     }
 
   } catch (const std::exception &e) {

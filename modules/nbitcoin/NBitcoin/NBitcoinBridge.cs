@@ -259,6 +259,31 @@ public static class Bridge
 
                     int sigCount = psbtInput.PartialSigs?.Count ?? 0;
                     result.Append($"in{i}sigs={sigCount};");
+
+                    result.Append($"in{i}rs={psbtInput.RedeemScript?.ToHex() ?? ""};");
+                    result.Append($"in{i}ws={psbtInput.WitnessScript?.ToHex() ?? ""};");
+
+                    // Raw PSBT_IN_SIGHASH_TYPE byte value, or 0 if unset.
+                    // SighashType/TaprootSighashType are mutually exclusive
+                    // (legacy vs taproot input); both enums are backed by
+                    // the same raw byte values as the wire format.
+                    uint sighash = 0;
+                    if (psbtInput.SighashType.HasValue)
+                    {
+                        sighash = (uint)psbtInput.SighashType.Value;
+                    }
+                    else if (psbtInput.TaprootSighashType.HasValue)
+                    {
+                        sighash = (uint)psbtInput.TaprootSighashType.Value;
+                    }
+                    result.Append($"in{i}sh={sighash};");
+
+                    result.Append($"in{i}bip32={psbtInput.HDKeyPaths.Count};");
+
+                    if (psbtInput.IsFinalized())
+                    {
+                        result.Append($"in{i}fin=1;");
+                    }
                 }
             }
 
@@ -271,6 +296,14 @@ public static class Bridge
 
                 string scriptHex = txOut.ScriptPubKey.ToHex();
                 result.Append($"out{i}script={scriptHex};");
+
+                if (i < psbt.Outputs.Count)
+                {
+                    var psbtOutput = psbt.Outputs[i];
+                    result.Append($"out{i}rs={psbtOutput.RedeemScript?.ToHex() ?? ""};");
+                    result.Append($"out{i}ws={psbtOutput.WitnessScript?.ToHex() ?? ""};");
+                    result.Append($"out{i}bip32={psbtOutput.HDKeyPaths.Count};");
+                }
             }
 
             return Marshal.StringToHGlobalAnsi(result.ToString());

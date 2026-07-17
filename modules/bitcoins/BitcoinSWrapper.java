@@ -6,10 +6,12 @@ import org.bitcoins.core.crypto.ExtPrivateKey$;
 import org.bitcoins.core.crypto.ExtPublicKey;
 import org.bitcoins.core.hd.BIP32Path;
 import org.bitcoins.core.hd.BIP32Path$;
+import org.bitcoins.core.protocol.script.Script;
 import org.bitcoins.core.protocol.transaction.Transaction;
 import org.bitcoins.core.protocol.transaction.TransactionInput;
 import org.bitcoins.core.protocol.transaction.TransactionOutput;
 import org.bitcoins.core.psbt.InputPSBTMap;
+import org.bitcoins.core.psbt.OutputPSBTMap;
 import org.bitcoins.core.psbt.PSBT;
 import org.bitcoins.core.psbt.PSBT$;
 import scala.util.Try;
@@ -109,6 +111,39 @@ public class BitcoinSWrapper {
             .append("sigs=")
             .append(inp.partialSignatures().size())
             .append(";");
+
+        // .hex() on a script includes bitcoin-s's own compact-size length
+        // prefix; .asmHex() is the raw script bytes, matching the other
+        // modules' HexStr(script)-style output.
+        String redeemScriptHex =
+            inp.redeemScriptOpt().isDefined()
+                ? inp.redeemScriptOpt().get().redeemScript().asmHex()
+                : "";
+        sb.append("in").append(i).append("rs=").append(redeemScriptHex).append(";");
+
+        // witnessScript() is typed as RawScriptPubKey, an interface that
+        // doesn't itself expose asmHex() to Java; cast to Script (every
+        // concrete implementation extends it) to reach it.
+        String witnessScriptHex =
+            inp.witnessScriptOpt().isDefined()
+                ? ((Script) inp.witnessScriptOpt().get().witnessScript()).asmHex()
+                : "";
+        sb.append("in").append(i).append("ws=").append(witnessScriptHex).append(";");
+
+        // raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset
+        int sighash =
+            inp.sigHashTypeOpt().isDefined() ? inp.sigHashTypeOpt().get().hashType().num() : 0;
+        sb.append("in").append(i).append("sh=").append(sighash).append(";");
+
+        sb.append("in")
+            .append(i)
+            .append("bip32=")
+            .append(inp.BIP32DerivationPaths().length())
+            .append(";");
+
+        if (inp.isFinalized()) {
+          sb.append("in").append(i).append("fin=1;");
+        }
       }
 
       scala.collection.immutable.Seq<?> outputs = tx.outputs();
@@ -124,6 +159,28 @@ public class BitcoinSWrapper {
             .append("script=")
             .append(txOut.scriptPubKey().asmHex())
             .append(";");
+
+        if (i < psbt.outputMaps().length()) {
+          OutputPSBTMap out = (OutputPSBTMap) psbt.outputMaps().apply(i);
+
+          String outRedeemScriptHex =
+              out.redeemScriptOpt().isDefined()
+                  ? out.redeemScriptOpt().get().redeemScript().asmHex()
+                  : "";
+          sb.append("out").append(i).append("rs=").append(outRedeemScriptHex).append(";");
+
+          String outWitnessScriptHex =
+              out.witnessScriptOpt().isDefined()
+                  ? out.witnessScriptOpt().get().witnessScript().asmHex()
+                  : "";
+          sb.append("out").append(i).append("ws=").append(outWitnessScriptHex).append(";");
+
+          sb.append("out")
+              .append(i)
+              .append("bip32=")
+              .append(out.BIP32DerivationPaths().length())
+              .append(";");
+        }
       }
 
       return sb.toString();
