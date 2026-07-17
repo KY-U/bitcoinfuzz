@@ -119,7 +119,11 @@ public class BitcoinSWrapper {
             .append("val=")
             .append(txOut.value().satoshis().toLong())
             .append(";");
-        sb.append("out").append(i).append("script=").append(txOut.scriptPubKey().hex()).append(";");
+        sb.append("out")
+            .append(i)
+            .append("script=")
+            .append(txOut.scriptPubKey().asmHex())
+            .append(";");
       }
 
       return sb.toString();
