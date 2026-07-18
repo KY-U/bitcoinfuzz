@@ -7,6 +7,14 @@ BITCOIN_URL := https://github.com/bitcoin/bitcoin.git
 KERNEL_BUILD_DIR := $(BITCOIN_DIR)/build-kernel
 KERNEL_LIB := $(KERNEL_BUILD_DIR)/lib/libbitcoinkernel.a
 
+SYMBOL_PREFIX ?= bitcoinkernel
+
+# Detect objcopy command
+OBJCOPY := $(shell command -v objcopy 2> /dev/null)
+ifeq ($(OBJCOPY),)
+$(error objcopy not found. Install with: apt-get install binutils)
+endif
+
 # Resolve Version Reference
 DEFAULT_REF:= master
 BITCOINKERNEL_REF ?=
@@ -15,8 +23,28 @@ $(warning BITCOINKERNEL_REF not set. Defaulting to $(DEFAULT_REF).)
 BITCOINKERNEL_REF := $(DEFAULT_REF)
 endif
 
-module.a: $(KERNEL_LIB) module.o
-	bash ../../merge.sh module.a $(KERNEL_LIB) module.o
+# libbitcoinkernel bundles a full copy of Bitcoin Core's consensus/validation
+# code (validation.cpp, secp256k1, ...) as plain, non-weak symbols. Other
+# modules (e.g. modules/bitcoin) embed their own copy of the same code, so
+# linking both into one binary causes multiple-definition errors. Prefix
+# every symbol in the kernel library so it can't collide. Same pattern as
+# modules/bitcoinkernelvariant/Makefile.
+bitcoinkernel_symbols.map: $(KERNEL_LIB)
+	@echo "Generating symbol map for $(SYMBOL_PREFIX)..."
+	@{ \
+		nm -g --defined-only $(KERNEL_LIB) | awk '{print $$3}'; \
+		nm --defined-only $(KERNEL_LIB) | awk '$$2 == "n" {print $$3}'; \
+	} | grep -Ev '^$$' | sort -u | while read sym; do \
+		echo "$$sym $(SYMBOL_PREFIX)_$$sym"; \
+	done > $@
+	@sort -u -o $@ $@
+	@echo "Generated $$(wc -l < $@) symbol mappings"
+
+module.a: $(KERNEL_LIB) bitcoinkernel_symbols.map module.o
+	bash ../../merge.sh module_temp.a $(KERNEL_LIB) module.o
+	$(OBJCOPY) --redefine-syms=bitcoinkernel_symbols.map module_temp.a module.a
+	rm -f module_temp.a
+	ranlib module.a
 
 $(KERNEL_LIB): bitcoin-sync
 	cd $(BITCOIN_DIR) && \
@@ -71,6 +99,6 @@ check-format:
 	clang-format -Werror --fail-on-incomplete-format -n module.h module.cpp
 
 clean:
-	rm -rf *.o module.a bitcoin/build-kernel
+	rm -rf *.o module.a module_temp.a bitcoinkernel_symbols.map bitcoin/build-kernel
 
 .PHONY: all format check-format clean bitcoin-sync

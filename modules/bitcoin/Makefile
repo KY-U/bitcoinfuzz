@@ -266,12 +266,21 @@ $(LEVELDB_LIB): $(LEVELDB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $(LEVELDB_OBJS)
 
-# Generate symbol redefine map for ONLY secp256k1 symbols (exclude ASAN/sanitizer symbols)
+# Generate symbol redefine map: prefix every global symbol defined in
+# libsecp256k1.a (not just secp256k1_*) so they don't collide with the
+# standalone secp256k1 module when both are linked together. This catches the
+# `__odr_asan_gen_*` ODR-detection symbols that ASAN auto-generates, which
+# would otherwise produce multiple-definition errors at the final link.
+# Same pattern as modules/libbitcoinsystem/Makefile.
 secp256k1_symbols.map: $(SECP256K1_LIB)
 	@echo "Generating comprehensive symbol map..."
-	@nm -g $(SECP256K1_LIB) | awk '{print $$3}' | grep '^secp256k1' | sort -u | while read sym; do \
+	@{ \
+		nm -g --defined-only $(SECP256K1_LIB) | awk '{print $$3}'; \
+		nm --defined-only $(SECP256K1_LIB) | awk '$$2 == "n" {print $$3}'; \
+	} | grep -Ev '^$$' | sort -u | while read sym; do \
 		echo "$$sym $(SYMBOL_PREFIX)_$$sym"; \
 	done > $@
+	@sort -u -o $@ $@
 	@echo "Generated $$(wc -l < $@) symbol mappings"
 
 .PHONY: compile_objects
@@ -299,19 +308,15 @@ module.a: $(SECP256K1_LIB) $(UNIVALUE_LIB) $(LEVELDB_LIB) secp256k1_symbols.map 
 	$(AR) rcs $@ module.o cleanse.o $(BITCOIN_OBJS)
 
 	mkdir -p tmp_obj
-	# Extract secp256k1 objects and rename ONLY secp256k1_* symbols
+	# Extract secp256k1 objects and rename symbols using the same
+	# comprehensive map applied to the Bitcoin objects above, so every
+	# defined symbol (including ASAN's __odr_asan_gen_* ODR-detection
+	# globals) is prefixed and can't collide with the standalone
+	# secp256k1 module.
 	cd tmp_obj && $(AR) x ../$(SECP256K1_LIB)
-	@echo "Renaming only secp256k1_* symbols (preserving ASAN/sanitizer symbols)..."
+	@echo "Renaming secp256k1 symbols (including ASAN ODR globals)..."
 	cd tmp_obj && for obj in *.o; do \
-		for sym in $$(nm $$obj | grep ' T secp256k1' | awk '{print $$3}'); do \
-			$(OBJCOPY) --redefine-sym $$sym=$(SYMBOL_PREFIX)_$$sym $$obj 2>/dev/null || true; \
-		done; \
-		for sym in $$(nm $$obj | grep ' D secp256k1' | awk '{print $$3}'); do \
-			$(OBJCOPY) --redefine-sym $$sym=$(SYMBOL_PREFIX)_$$sym $$obj 2>/dev/null || true; \
-		done; \
-		for sym in $$(nm $$obj | grep ' B secp256k1' | awk '{print $$3}'); do \
-			$(OBJCOPY) --redefine-sym $$sym=$(SYMBOL_PREFIX)_$$sym $$obj 2>/dev/null || true; \
-		done; \
+		$(OBJCOPY) --redefine-syms=../secp256k1_symbols.map $$obj; \
 	done
 	$(AR) rcs $@ tmp_obj/*.o
 	rm -rf tmp_obj/*
