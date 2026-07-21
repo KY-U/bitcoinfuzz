@@ -57,7 +57,13 @@ def get_module_dir(flag: str) -> str:
     return f"modules/{flag.lower().replace('_', '')}"
 
 def should_build_sequentially(flag: str) -> bool:
-    return flag in {"SECP256K1", "BITCOINJ", "LIGHTNING_KMP"} or flag.startswith(
+    return flag in {
+        "SECP256K1",
+        "BITCOINJ",
+        "LIGHTNING_KMP",
+        "BITCOINKERNEL",
+        "BITCOINKERNEL_VARIANT",
+    } or flag.startswith(
         "CUSTOM_MUTATOR_"
     )
 

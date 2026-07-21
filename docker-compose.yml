@@ -103,6 +103,22 @@ services:
     volumes:
       - ./docker:/app/data
 
+  kernel_block_check:
+    build:
+      context: .
+      tags:
+        - bitcoinfuzz:kernel_block_check
+      args:
+        CXXFLAGS: "-DBITCOINKERNEL -DBITCOINKERNEL_VARIANT -DPYBITCOINKERNEL -DRUSTBITCOINKERNEL"
+        FUZZ: kernel_block_check
+    env_file: .env
+    environment:
+      MODULES: ${MODULES:-}
+      LIBFUZZ_DETECT_LEAKS: 0
+      ASAN_OPTIONS: detect_leaks=0
+    volumes:
+      - ./docker:/app/data
+
   cmpctblocks_parse:
     build:
       context: .

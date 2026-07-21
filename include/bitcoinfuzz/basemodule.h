@@ -66,6 +66,8 @@ public:
   virtual std::optional<std::string>
   kernel_transaction(std::span<const uint8_t> buffer) const;
   virtual std::optional<std::string>
+  kernel_block_check(std::span<const uint8_t> buffer) const;
+  virtual std::optional<std::string>
   private_to_public_key(std::span<const uint8_t> buffer) const;
   virtual std::optional<std::string>
   sign_compact(std::span<const uint8_t> buffer,

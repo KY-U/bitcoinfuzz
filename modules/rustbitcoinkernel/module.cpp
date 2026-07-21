@@ -28,5 +28,16 @@ Rustbitcoinkernel::kernel_block(std::span<const uint8_t> buffer) const {
   kernel_free_c_string(result_ptr);
   return result;
 }
+
+std::optional<std::string>
+Rustbitcoinkernel::kernel_block_check(std::span<const uint8_t> buffer) const {
+  auto result_ptr = rustbitcoinkernel_block_check(buffer.data(), buffer.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  kernel_free_c_string(result_ptr);
+  return result;
+}
 } // namespace module
 } // namespace bitcoinfuzz
