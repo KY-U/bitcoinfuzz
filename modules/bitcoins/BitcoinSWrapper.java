@@ -130,10 +130,18 @@ public class BitcoinSWrapper {
                 : "";
         sb.append("in").append(i).append("ws=").append(witnessScriptHex).append(";");
 
-        // raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset
+        // raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset. HashType.num() is a
+        // signed Java int holding the raw 4 bytes, so any value with the top
+        // bit set (e.g. 0xfe8f263f) would render negative, while every other
+        // module formats it unsigned (Bitcoin Core casts to uint32_t, btcd to
+        // uint32, rust-psbt uses to_u32). Print it unsigned to match.
         int sighash =
             inp.sigHashTypeOpt().isDefined() ? inp.sigHashTypeOpt().get().hashType().num() : 0;
-        sb.append("in").append(i).append("sh=").append(sighash).append(";");
+        sb.append("in")
+            .append(i)
+            .append("sh=")
+            .append(Integer.toUnsignedString(sighash))
+            .append(";");
 
         sb.append("in")
             .append(i)
