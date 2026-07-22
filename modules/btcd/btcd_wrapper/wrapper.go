@@ -253,6 +253,25 @@ func BTCDTransactionEval(data C.ByteArray) *C.char {
 	return C.CString(res)
 }
 
+// finalWitnessHasItems reports whether a PSBT_IN_FINAL_SCRIPTWITNESS value
+// holds at least one witness item. btcd keeps this field as the raw serialized
+// witness (a compact-size item count followed by the items), so an *empty*
+// stack is still one byte (0x00) and a plain len() > 0 check would call it
+// finalized. Bitcoin Core stores its final witness as a plain CScriptWitness
+// whose IsNull() is just stack.empty(), so it cannot distinguish an absent key
+// from one present with a zero-item stack; matching on item count keeps the
+// `fin` flag comparable across modules. An empty witness finalizes nothing.
+func finalWitnessHasItems(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	count, err := wire.ReadVarInt(bytes.NewReader(raw), 0)
+	if err != nil {
+		return false
+	}
+	return count > 0
+}
+
 //export BTCDParsePSBT
 func BTCDParsePSBT(data C.ByteArray) *C.char {
 	buffer := C.GoBytes(unsafe.Pointer(data.data), data.length)
@@ -311,7 +330,7 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 			result.WriteString(fmt.Sprintf("in%dbip32=%d;", i, len(packet.Inputs[i].Bip32Derivation)))
 
 			// finalized status
-			if len(packet.Inputs[i].FinalScriptSig) > 0 || len(packet.Inputs[i].FinalScriptWitness) > 0 {
+			if len(packet.Inputs[i].FinalScriptSig) > 0 || finalWitnessHasItems(packet.Inputs[i].FinalScriptWitness) {
 				result.WriteString(fmt.Sprintf("in%dfin=1;", i))
 			}
 		}

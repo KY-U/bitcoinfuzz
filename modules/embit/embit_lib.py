@@ -85,9 +85,17 @@ def psbt_parse(data):
 
             result.append(f"in{i}bip32={len(psbt_input.bip32_derivations)}")
 
-            if (
-                psbt_input.final_scriptsig is not None
-                or psbt_input.final_scriptwitness is not None
+            # Report finalization on *non-empty* final scriptSig/scriptWitness
+            # rather than mere presence. Bitcoin Core stores the final witness
+            # as a plain CScriptWitness whose IsNull() is just stack.empty(),
+            # so it cannot tell an absent PSBT_IN_FINAL_SCRIPTWITNESS key from
+            # one present with a zero-item stack; presence-based semantics
+            # would make this flag incomparable across modules for that
+            # degenerate input. An empty witness finalizes nothing anyway.
+            final_scriptsig = psbt_input.final_scriptsig
+            final_scriptwitness = psbt_input.final_scriptwitness
+            if (final_scriptsig is not None and len(final_scriptsig.data) > 0) or (
+                final_scriptwitness is not None and len(final_scriptwitness.items) > 0
             ):
                 result.append(f"in{i}fin=1")
 

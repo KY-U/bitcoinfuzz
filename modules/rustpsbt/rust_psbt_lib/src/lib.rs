@@ -39,6 +39,15 @@ struct InputSummary {
     // Raw PSBT_IN_SIGHASH_TYPE byte value, or 0 if unset.
     sighash: u32,
     bip32_count: usize,
+    // Whether the input carries a *non-empty* final scriptSig or scriptWitness.
+    // Emptiness rather than presence is deliberate: Bitcoin Core stores
+    // `final_script_witness` as a plain `CScriptWitness` (not an optional), and
+    // its `IsNull()` is just `stack.empty()`, so Core cannot distinguish an
+    // absent PSBT_IN_FINAL_SCRIPTWITNESS key from one present with a zero-item
+    // stack. Presence-based semantics would therefore make this flag
+    // incomparable across modules for that (degenerate, information-free)
+    // input. An empty witness finalizes nothing, so "non-empty" is also the
+    // more meaningful reading.
     finalized: bool,
 }
 
@@ -119,8 +128,14 @@ fn try_parse_v0(data: &[u8]) -> Option<String> {
                 .unwrap_or_default(),
             sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
             bip32_count: psbt_input.bip32_derivation.len(),
-            finalized: psbt_input.final_script_sig.is_some()
-                || psbt_input.final_script_witness.is_some(),
+            finalized: psbt_input
+                .final_script_sig
+                .as_ref()
+                .is_some_and(|s| !s.is_empty())
+                || psbt_input
+                    .final_script_witness
+                    .as_ref()
+                    .is_some_and(|w| !w.is_empty()),
         })
         .collect();
 
@@ -258,8 +273,14 @@ fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
                 .unwrap_or_default(),
             sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
             bip32_count: psbt_input.bip32_derivations.len(),
-            finalized: psbt_input.final_script_sig.is_some()
-                || psbt_input.final_script_witness.is_some(),
+            finalized: psbt_input
+                .final_script_sig
+                .as_ref()
+                .is_some_and(|s| !s.is_empty())
+                || psbt_input
+                    .final_script_witness
+                    .as_ref()
+                    .is_some_and(|w| !w.is_empty()),
         })
         .collect();
 

@@ -278,6 +278,7 @@ std::optional<uint32_t> DetermineV2LockTime(const struct wally_psbt *psbt) {
 // external/libwally-core/src/psbt_io.h).
 constexpr uint32_t PSBT_IN_REDEEM_SCRIPT_KT = 0x04;
 constexpr uint32_t PSBT_IN_WITNESS_SCRIPT_KT = 0x05;
+constexpr uint32_t PSBT_IN_FINAL_SCRIPTSIG_KT = 0x07;
 constexpr uint32_t PSBT_OUT_REDEEM_SCRIPT_KT = 0x00;
 constexpr uint32_t PSBT_OUT_WITNESS_SCRIPT_KT = 0x01;
 
@@ -292,6 +293,21 @@ std::string GetMapFieldHex(const wally_map &fields, uint32_t keytype) {
   bool ok = hex_encode(item->value, item->value_len, hex.data(), hex.size());
   assert(ok);
   return std::string(hex.data());
+}
+
+// Whether the input carries a *non-empty* final scriptSig or scriptWitness.
+// Deliberately not wally_psbt_input_is_finalized(), which keys off the mere
+// presence of `final_witness`: Bitcoin Core stores its final witness as a plain
+// CScriptWitness whose IsNull() is just stack.empty(), so Core cannot
+// distinguish an absent PSBT_IN_FINAL_SCRIPTWITNESS key from one present with a
+// zero-item stack. Comparing on emptiness keeps the `fin` flag comparable
+// across modules for that degenerate input -- and an empty witness finalizes
+// nothing anyway.
+bool IsFinalized(const wally_psbt_input &input) {
+  if (input.final_witness != nullptr && input.final_witness->num_items > 0) {
+    return true;
+  }
+  return !GetMapFieldHex(input.psbt_fields, PSBT_IN_FINAL_SCRIPTSIG_KT).empty();
 }
 } // namespace
 
@@ -350,9 +366,7 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
         result << "in" << i << "sh=" << psbt_input.sighash << ";";
         result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
 
-        size_t finalized = 0;
-        wally_psbt_input_is_finalized(&psbt_input, &finalized);
-        if (finalized) {
+        if (IsFinalized(psbt_input)) {
           result << "in" << i << "fin=1;";
         }
       }
@@ -444,9 +458,7 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       result << "in" << i << "sh=" << psbt_input.sighash << ";";
       result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
 
-      size_t finalized = 0;
-      wally_psbt_input_is_finalized(&psbt_input, &finalized);
-      if (finalized) {
+      if (IsFinalized(psbt_input)) {
         result << "in" << i << "fin=1;";
       }
     }

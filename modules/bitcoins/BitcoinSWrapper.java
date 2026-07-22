@@ -141,7 +141,21 @@ public class BitcoinSWrapper {
             .append(inp.BIP32DerivationPaths().length())
             .append(";");
 
-        if (inp.isFinalized()) {
+        // Report finalization on a *non-empty* final scriptSig/scriptWitness
+        // rather than mere presence, which is what isFinalized() checks.
+        // Bitcoin Core stores its final witness as a plain CScriptWitness whose
+        // IsNull() is just stack.empty(), so it cannot distinguish an absent
+        // PSBT_IN_FINAL_SCRIPTWITNESS key from one present with a zero-item
+        // stack; presence-based semantics would make this flag incomparable
+        // across modules for that degenerate input. An empty witness finalizes
+        // nothing anyway.
+        boolean finalizedScriptSig =
+            inp.finalizedScriptSigOpt().isDefined()
+                && !((Script) inp.finalizedScriptSigOpt().get().scriptSig()).asmHex().isEmpty();
+        boolean finalizedScriptWitness =
+            inp.finalizedScriptWitnessOpt().isDefined()
+                && !inp.finalizedScriptWitnessOpt().get().scriptWitness().stack().isEmpty();
+        if (finalizedScriptSig || finalizedScriptWitness) {
           sb.append("in").append(i).append("fin=1;");
         }
       }

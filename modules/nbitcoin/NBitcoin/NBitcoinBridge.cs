@@ -280,7 +280,19 @@ public static class Bridge
 
                     result.Append($"in{i}bip32={psbtInput.HDKeyPaths.Count};");
 
-                    if (psbtInput.IsFinalized())
+                    // Report finalization on a *non-empty* final
+                    // scriptSig/scriptWitness rather than mere presence, which
+                    // is what PSBTInput.IsFinalized() checks. Bitcoin Core
+                    // stores its final witness as a plain CScriptWitness whose
+                    // IsNull() is just stack.empty(), so it cannot distinguish
+                    // an absent PSBT_IN_FINAL_SCRIPTWITNESS key from one
+                    // present with a zero-item stack; presence-based semantics
+                    // would make this flag incomparable across modules for that
+                    // degenerate input. An empty witness finalizes nothing.
+                    bool finalized =
+                        (psbtInput.FinalScriptSig != null && psbtInput.FinalScriptSig.Length > 0)
+                        || !WitScript.IsNullOrEmpty(psbtInput.FinalScriptWitness);
+                    if (finalized)
                     {
                         result.Append($"in{i}fin=1;");
                     }
