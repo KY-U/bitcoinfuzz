@@ -28,16 +28,25 @@ jobs:
   docker-build:
     needs: select-modules
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: libfuzzer
+            dockerfile: Dockerfile
+          - name: afl
+            dockerfile: Dockerfile.afl
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build Docker Image
+      - name: Build ${{ matrix.image.name }} Docker image
         run: |
-          docker build -t bitcoinfuzz:image-check \
+          docker build -f ${{ matrix.image.dockerfile }} \
+            -t bitcoinfuzz:image-check-${{ matrix.image.name }} \
             --build-arg FUZZ=image-check \
             --build-arg CXXFLAGS="${{ needs.select-modules.outputs.cxxflags }}" \
             .
