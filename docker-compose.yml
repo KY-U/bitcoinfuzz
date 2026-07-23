@@ -52,6 +52,7 @@ services:
     env_file: .env
     environment:
       MODULES: ${MODULES:-}
+      LIBFUZZ_DETECT_LEAKS: 0
     volumes:
       - ./docker:/app/data
 
