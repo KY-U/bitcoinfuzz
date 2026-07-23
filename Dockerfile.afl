@@ -1,0 +1,130 @@
+# syntax=docker/dockerfile:1.20
+FROM ubuntu:24.04 AS base
+RUN --mount=type=cache,target=/var/cache/apt,id=fuzz-afl-apt-cache-base \
+    --mount=type=cache,target=/var/lib/apt/lists,id=fuzz-afl-apt-lists-base \
+    apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    afl++ \
+    libcurl4t64 \
+    libllvm18 \
+    libpython3-dev \
+    libsodium-dev \
+    openjdk-21-jre-headless
+
+FROM base AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /build
+RUN --mount=type=cache,target=/var/cache/apt,id=fuzz-afl-apt-cache-builder \
+    --mount=type=cache,target=/var/lib/apt/lists,id=fuzz-afl-apt-lists-builder \
+    apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    autoconf \
+    automake \
+    clang-17 \
+    clang-18 \
+    cmake \
+    curl \
+    gcc \
+    git \
+    jq \
+    libasan6 \
+    libboost-all-dev \
+    libc6-dev \
+    libclang-rt-17-dev \
+    libclang-rt-dev \
+    libgcc-11-dev \
+    libsqlite3-dev \
+    libtool \
+    llvm-17-dev \
+    llvm-dev \
+    lowdown \
+    make \
+    nodejs \
+    npm \
+    openjdk-21-jdk-headless \
+    pkgconf \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    quickjs \
+    libquickjs \
+    rustup \
+    unzip
+RUN curl -sSfL https://go.dev/dl/go1.25.10.linux-amd64.tar.gz | tar -C /usr/local -xz
+ENV PATH="/usr/local/go/bin:$PATH"
+RUN rustup set profile minimal && rustup default nightly
+RUN curl -sSf -L -o dotnet-install.sh https://dot.net/v1/dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 9.0 --install-dir /usr/local/share/dotnet && \
+    rm dotnet-install.sh && \
+    ln -vs /usr/local/share/dotnet/dotnet /usr/local/bin/dotnet && \
+    dotnet --info
+ENV PATH="/venv/bin:$PATH" \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1
+COPY modules/embit/requirements.txt /tmp/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,id=fuzz-afl-pip \
+    python3 -m venv /venv && \
+    python3 -m ensurepip && \
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install mako setuptools 'cmake>=3.30' && \
+    python3 -m pip install -r /tmp/requirements.txt
+
+RUN curl -sSL -o /tmp/boost.tar.gz \
+        https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-cmake.tar.gz && \
+    tar -xzf /tmp/boost.tar.gz -C /tmp && \
+    cd /tmp/boost-1.86.0 && \
+    cmake -B build \
+        -DCMAKE_C_COMPILER=/usr/bin/clang-18 \
+        -DCMAKE_CXX_COMPILER=/usr/bin/clang++-18 \
+        -DCMAKE_INSTALL_PREFIX=/opt/boost-1.86 \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBOOST_INCLUDE_LIBRARIES="iostreams;locale;program_options;thread;url;test;regex;filesystem;system;date_time;chrono;atomic;random;container;charconv;json" && \
+    cmake --build build --parallel "$(nproc)" && \
+    cmake --install build && \
+    rm -rf /tmp/boost.tar.gz /tmp/boost-1.86.0
+ENV BOOST_ROOT=/opt/boost-1.86
+
+COPY . .
+
+ARG CXXFLAGS
+ARG FUZZ
+ENV CC=/usr/bin/afl-clang-fast \
+    CXX=/usr/bin/afl-clang-fast++ \
+    LDFLAGS="-lsodium"
+
+RUN \
+    --mount=type=cache,target=/root/.cache/go-build,id=fuzz-afl-go-build \
+    --mount=type=cache,target=/root/.cache/pip,id=fuzz-afl-pip-build \
+    --mount=type=cache,target=/root/.cargo/git,id=fuzz-afl-cargo-git \
+    --mount=type=cache,target=/root/.cargo/registry,id=fuzz-afl-cargo-registry \
+    --mount=type=cache,target=/root/.gradle,id=fuzz-afl-gradle \
+    --mount=type=cache,target=/root/.m2,id=fuzz-afl-maven \
+    --mount=type=cache,target=/root/.nuget/packages,id=fuzz-afl-nuget-build \
+    --mount=type=cache,target=/root/go/pkg/mod,id=fuzz-afl-go-mod \
+    export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-$(dpkg --print-architecture) && \
+    /build/auto_build.py
+
+FROM base AS runner
+LABEL org.opencontainers.image.title="Bitcoin Fuzz AFL++"
+LABEL org.opencontainers.image.description="Bitcoin fuzzing framework built for AFL++"
+LABEL org.opencontainers.image.source="https://github.com/bitcoinfuzz/bitcoinfuzz"
+LABEL org.opencontainers.image.licenses="MIT"
+WORKDIR /app
+VOLUME ["/app/data"]
+ARG FUZZ
+ENV FUZZ=${FUZZ} \
+    MODULES="" \
+    AFL_AUTORESUME=1
+COPY --from=builder --chmod=0755 /build/bitcoinfuzz /app/bitcoinfuzz
+COPY --from=builder \
+    --parents \
+    --exclude=**/gradle-wrapper.jar \
+    --exclude=**/eclair_extracted/ \
+    /build/modules/*/lib /
+COPY --from=builder /build/*.so /app/
+COPY --from=builder --parents \
+    --exclude=modules/bitcoin/secp256k1/tools \
+    --exclude=modules/**/target \
+    /build/./modules/**/*.py /app/
+COPY --chmod=0755 afl-entrypoint.sh /usr/local/bin/afl-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/afl-entrypoint.sh"]

@@ -50,6 +50,10 @@ $ echo A > inputs/thin-air-input
 $ FUZZ=addrv2 ./AFLplusplus/afl-fuzz -i inputs/ -o outputs/ -- ./bitcoinfuzz
 ```
 
+If you want the same workflow in a container, see the AFL++ Docker section in
+[RUNNING.md](./RUNNING.md), which includes build/run examples, corpus
+persistence, resume behavior, and the Linux `core_pattern` caveat.
+
 Read the [afl++ documentation](https://github.com/AFLplusplus/AFLplusplus) for more information.
 
 # Build Options
