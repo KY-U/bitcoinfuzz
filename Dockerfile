@@ -115,14 +115,13 @@ LABEL org.opencontainers.image.source="https://github.com/bitcoinfuzz/bitcoinfuz
 LABEL org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 VOLUME ["/app/data"]
+# FUZZ picks the target at runtime (see main.cpp); the build arg only bakes a
+# default so `docker run` works without -e FUZZ. Data lives in a per-target
+# subfolder of FUZZ_DATAROOT, resolved by the entrypoint, so a single image can
+# run any target whose modules were linked in via CXXFLAGS.
 ARG FUZZ
-ENV FUZZ_DATADIR=/app/data/${FUZZ} \
-    FUZZ=${FUZZ}
-RUN if [ -z "${FUZZ}" ]; then \
-    echo "FUZZ build arg var is required"; \
-    exit 1; \
-    fi && \
-    mkdir -p ${FUZZ_DATADIR}
+ENV FUZZ=${FUZZ} \
+    FUZZ_DATAROOT=/app/data
 COPY --from=builder --chmod=0755 /build/bitcoinfuzz .
 # shared libs
 COPY --from=builder \
@@ -146,7 +145,12 @@ COPY --from=builder --parents \
 # from the website https://llvm.org/docs/LibFuzzer.html#options
 # mkdir to init and make sure we have write permissions
 #
-ENTRYPOINT mkdir -p $FUZZ_DATADIR/crash \
+ENTRYPOINT if [ -z "${FUZZ}" ]; then \
+    echo "FUZZ environment variable must be set" >&2; \
+    exit 1; \
+    fi \
+    && FUZZ_DATADIR="${FUZZ_DATADIR:-${FUZZ_DATAROOT}/${FUZZ}}" \
+    && mkdir -p $FUZZ_DATADIR/crash \
     $FUZZ_DATADIR/corpus \
     && exec /app/bitcoinfuzz \
     -artifact_prefix=${FUZZ_DATADIR}/crash/ \
