@@ -94,6 +94,25 @@ docker run --rm \
 > [!NOTE]
 > Replace the bind mount with a named volume if preferred: `docker run ... -v bitcoinfuzz-data:/app/data ...`. Be aware that folder will be created.
 
+### Running several targets from one image
+
+`FUZZ` selects the fuzz target at runtime, so the `--build-arg FUZZ=...` only bakes a default into
+the image. Any target can be picked per container with `-e FUZZ=`, and its corpus/crashes land in
+their own subfolder of `/app/data`:
+
+```bash
+docker run --rm -e FUZZ=psbt_parse -v "$(pwd)/docker":/app/data bitcoinfuzz:script
+# -> corpus in ./docker/psbt_parse/corpus, crashes in ./docker/psbt_parse/crash
+```
+
+Set `FUZZ_DATAROOT` to relocate the parent folder, or `FUZZ_DATADIR` to override the full path.
+
+> [!IMPORTANT]
+> Only `FUZZ` is a runtime choice. `CXXFLAGS` is a **build-time** arg that decides which library
+> modules are compiled and linked in, and `docker-compose.yml` gives each target a minimal set. To
+> run several targets from one image, build it with the union of the `-D` flags those targets need,
+> otherwise the differential comparison runs against fewer implementations than expected.
+
 ### Selective Module Loading
 
 You can use the `MODULES` environment variable to load only specific modules at runtime, without rebuilding the image:
