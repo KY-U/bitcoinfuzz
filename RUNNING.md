@@ -124,6 +124,60 @@ To build outside of Docker (useful for local debugging), execute `auto_build.py`
 CXXFLAGS="-DBITCOIN_CORE -DRUST_BITCOIN" ./auto_build.py
 ```
 
+### Option 5 - AFL++ in Docker
+
+The repository also ships an AFL++ image that builds the same target/module set
+using `afl-clang-fast` and runs `afl-fuzz` inside the container.
+
+```bash
+mkdir -p docker-afl
+
+docker build -f Dockerfile.afl -t bitcoinfuzz-afl:verify_script \
+  --build-arg FUZZ=verify_script \
+  --build-arg "CXXFLAGS=-DBITCOIN_CORE -DBTCD -DGOCOIN -DNBITCOIN -DLIBBITCOIN_SYSTEM" .
+
+docker run --rm -it \
+  -e FUZZ=verify_script \
+  -e MODULES="BITCOIN_CORE,BTCD,LIBBITCOIN_SYSTEM" \
+  -e AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+  -v "$(pwd)/docker-afl":/app/data \
+  bitcoinfuzz-afl:verify_script
+```
+
+On many Linux hosts, AFL++ aborts if the kernel `core_pattern` pipes crashes to
+an external utility. For container-based local fuzzing, the practical fix is
+usually:
+
+```bash
+-e AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
+```
+
+If you want the stricter host-side fix instead, run:
+
+```bash
+echo core | sudo tee /proc/sys/kernel/core_pattern
+```
+
+By default the container stores AFL++ state under `/app/data/<target>/`:
+
+- seeds: `/app/data/<target>/in`
+- queue, crashes, hangs, stats: `/app/data/<target>/out`
+
+If the input directory is empty, the entrypoint creates a single seed file
+automatically. Resume is enabled by default via `AFL_AUTORESUME=1`; if
+`/app/data/<target>/out/default` already exists, the container runs `afl-fuzz`
+with `-i-` and continues the previous session.
+
+You can pass additional AFL++ flags after the image name:
+
+```bash
+docker run --rm -it \
+  -e FUZZ=verify_script \
+  -v "$(pwd)/docker-afl":/app/data \
+  bitcoinfuzz-afl:verify_script \
+  -m none -t 2000+
+```
+
 This script cleans and builds modules based on `CXXFLAGS`, and then compiles the root project.
 
 ### Miniscript parser module pairings
