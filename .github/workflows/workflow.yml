@@ -136,7 +136,7 @@ jobs:
           -DPYCOIN \
           -DLIBBITCOIN_SYSTEM" \
           ONLY_MODULES=1 \
-          ./auto_build.py
+          ./scripts/auto_build.py
 
       - name: Cache build artifacts
         uses: actions/cache/save@v4

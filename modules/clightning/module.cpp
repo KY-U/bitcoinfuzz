@@ -42,13 +42,16 @@ struct CleanTmpCtxGuard {
   CleanTmpCtxGuard &operator=(const CleanTmpCtxGuard &) = delete;
 };
 
-void init(int *argc, char ***argv) {
+// Internal linkage: several modules define helpers with these names, and any
+// two of them would otherwise collide at link time when both modules are built
+// into the same binary.
+static void init(int *argc, char ***argv) {
   if (!tmpctx) {
     common_setup("fuzzer");
   }
 }
 
-std::string hex_encode(const unsigned char *data, size_t len) {
+static std::string hex_encode(const unsigned char *data, size_t len) {
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
   for (size_t i = 0; i < len; ++i) {

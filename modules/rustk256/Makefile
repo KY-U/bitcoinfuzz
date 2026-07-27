@@ -19,7 +19,7 @@ $(K256_LIB_PATH):
 cargo: $(K256_LIB_PATH)
 
 module.a: module.o $(K256_LIB_PATH)
-	bash ../../merge.sh module.a $(K256_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module.a $(K256_LIB_PATH) module.o
 	ranlib module.a
 
 module.o: module.cpp module.h

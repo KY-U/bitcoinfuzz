@@ -4,7 +4,8 @@ set -euo pipefail
 BASE_SHA="${1:-}"
 HEAD_SHA="${2:-}"
 
-CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+# -w: whitespace-only churn must not pull a module into the build.
+CHANGED_FILES="$(git diff -w --name-only "$BASE_SHA" "$HEAD_SHA")"
 
 declare -A MODULE_FLAGS=(
   [bitcoin]="-DBITCOIN_CORE"

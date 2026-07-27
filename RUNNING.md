@@ -140,7 +140,7 @@ To build outside of Docker (useful for local debugging), execute `auto_build.py`
 
 ```bash
 # pass in the modules you want to compile with -D<mod> in CXXFLAGS
-CXXFLAGS="-DBITCOIN_CORE -DRUST_BITCOIN" ./auto_build.py
+CXXFLAGS="-DBITCOIN_CORE -DRUST_BITCOIN" ./scripts/auto_build.py
 ```
 
 ### Option 5 - AFL++ in Docker

@@ -4,6 +4,10 @@ CXXFLAGS += -Wall -Wextra -fsanitize=address,fuzzer -std=c++20 -I ../../include
 
 MUSIG2_LIB_PATH := ./musig2_lib/target/release/libmusig2_lib.a
 
+# Namespace this module's vendored libsecp256k1 so it can be linked alongside
+# other Rust modules pinning the same secp256k1-sys version.
+SYMBOL_PREFIX ?= rustmusig2
+
 $(MUSIG2_LIB_PATH):
 	cd musig2_lib && \
 	RUSTFLAGS="\
@@ -19,7 +23,8 @@ $(MUSIG2_LIB_PATH):
 cargo: $(MUSIG2_LIB_PATH)
 
 module.a: module.o $(MUSIG2_LIB_PATH)
-	bash ../../merge.sh module.a $(MUSIG2_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module.a $(MUSIG2_LIB_PATH) module.o
+	bash ../../scripts/rename_rust_secp_symbols.sh module.a $(SYMBOL_PREFIX)
 	ranlib module.a
 
 module.o: module.cpp module.h

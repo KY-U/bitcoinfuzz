@@ -4,6 +4,10 @@ CXXFLAGS += -Wall -Wextra -fsanitize=address,fuzzer -std=c++20 -I ../../include
 # MacOS: ./rust_bitcoin_lib/target/aarch64-apple-darwin/release/librust_bitcoin_lib.a
 RUST_LIB_PATH := ./rust_bitcoin_lib/target/release/librust_bitcoin_lib.a
 
+# Namespace this module's vendored libsecp256k1 so it can be linked alongside
+# other Rust modules pinning the same secp256k1-sys version.
+SYMBOL_PREFIX ?= rustbitcoin
+
 $(RUST_LIB_PATH):
 	cd rust_bitcoin_lib && \
 	RUSTFLAGS="\
@@ -19,7 +23,8 @@ $(RUST_LIB_PATH):
 cargo: $(RUST_LIB_PATH)
 
 module.a: module.o $(RUST_LIB_PATH)
-	bash ../../merge.sh module.a $(RUST_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module.a $(RUST_LIB_PATH) module.o
+	bash ../../scripts/rename_rust_secp_symbols.sh module.a $(SYMBOL_PREFIX)
 	ranlib module.a
 
 module.o: module.cpp module.h

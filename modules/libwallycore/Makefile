@@ -28,7 +28,7 @@ $(LIBWALLY_CORE_LIB):
 	$(MAKE)
 
 module.a: $(LIBWALLY_CORE_LIB) $(LIBWALLY_CORE_SECP_LIB) module.o
-	bash ../../merge.sh module.a $(LIBWALLY_CORE_LIB) module.o
+	bash ../../scripts/merge.sh module.a $(LIBWALLY_CORE_LIB) module.o
 	rm -rf _secp_tmp && mkdir _secp_tmp
 	cd _secp_tmp && ar x ../$(LIBWALLY_CORE_SECP_LIB)
 	ar rcs module.a _secp_tmp/*.o
@@ -44,7 +44,7 @@ module.a: $(LIBWALLY_CORE_LIB) $(LIBWALLY_CORE_SECP_LIB) module.o
 module.o: module.cpp module.h
 	$(CXX) $(CXXFLAGS) -I . -fPIC -c module.cpp -o module.o
 
-format: 
+format:
 	clang-format -i ./module.cpp ./module.h
 
 check-format:

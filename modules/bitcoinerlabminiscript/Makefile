@@ -33,7 +33,7 @@ check-quickjs:
 	@test -f "$(QUICKJS_LIB)" || { echo "Error: libquickjs.a not found at $(QUICKJS_LIB). Install QuickJS static library"; exit 1; }
 
 module.a: module.o $(BUNDLE_O) $(QUICKJS_LIB)
-	bash ../../merge.sh module.a $(QUICKJS_LIB) module.o $(BUNDLE_O)
+	bash ../../scripts/merge.sh module.a $(QUICKJS_LIB) module.o $(BUNDLE_O)
 	ranlib module.a
 
 $(NODE_MODULES_DIR): $(TS_DIR)/package.json $(TS_DIR)/package-lock.json

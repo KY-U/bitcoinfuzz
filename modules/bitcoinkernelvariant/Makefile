@@ -41,7 +41,7 @@ module.a: $(KERNEL_LIB) variant_symbols.map module.o
 	@echo "Building module.a with symbol prefix: $(SYMBOL_PREFIX)"
 
 	# Merge wrapper object + kernel library first.
-	bash ../../merge.sh module_temp.a $(KERNEL_LIB) module.o
+	bash ../../scripts/merge.sh module_temp.a $(KERNEL_LIB) module.o
 
 	# Rewrite symbols directly in the archive to preserve duplicate member names.
 	@echo "Renaming symbols with $(SYMBOL_PREFIX)_ prefix..."
