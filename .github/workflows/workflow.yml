@@ -115,7 +115,6 @@ jobs:
           -DEMBIT \
           -DPYBITCOINKERNEL \
           -DBITCOINKERNEL \
-          -DBITCOINKERNEL_VARIANT \
           -DLND \
           -DLDK \
           -DNLIGHTNING \
