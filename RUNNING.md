@@ -107,6 +107,29 @@ docker run --rm -e FUZZ=psbt_parse -v "$(pwd)/docker":/app/data bitcoinfuzz:scri
 
 Set `FUZZ_DATAROOT` to relocate the parent folder, or `FUZZ_DATADIR` to override the full path.
 
+### Leak detection and fork mode
+
+`LIBFUZZ_DETECT_LEAKS` defaults to `0` whenever `-fork` is on (which is the default, sized from
+the container's CPU quota). It sets both libFuzzer's `-detect_leaks` flag and `detect_leaks` in
+`ASAN_OPTIONS`, because those are separate knobs: `-detect_leaks=0` alone only disables
+libFuzzer's per-input leak attribution, leaving ASan to still run LeakSanitizer at process exit.
+
+That exit-time check is the problem under `-fork`. Fork children exit every time slice, so any
+one-time library initialization allocation is reported on each child exit. The parent counts it
+as a crash and writes an empty `crash-da39a3ee5e6b4b0d3255bfef95601890afd80709` artifact — that
+SHA1 is the hash of no input at all, which is why replaying it does nothing. Without `-fork` the
+process never exits, so the check never fires and the same run looks clean.
+
+To hunt real leaks, use a dedicated single-process run rather than fighting fork mode:
+
+```bash
+docker run --rm -e FUZZ=verify_script -e LIBFUZZ_FORK=0 \
+  -v "$(pwd)/docker":/app/data bitcoinfuzz:verify_script
+```
+
+Setting `LIBFUZZ_DETECT_LEAKS=1` re-enables both knobs even with `-fork` on, and an explicitly
+provided `ASAN_OPTIONS` is always passed through untouched.
+
 > [!IMPORTANT]
 > Only `FUZZ` is a runtime choice. `CXXFLAGS` is a **build-time** arg that decides which library
 > modules are compiled and linked in, and `docker-compose.yml` gives each target a minimal set. To
