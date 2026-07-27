@@ -14,7 +14,10 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-import platform
+
+# Every path below (modules/, custommutator/, the top-level make) is relative to
+# the repository root, so anchor to it rather than to the caller's directory.
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def die(msg: str) -> NoReturn:
     print(f"Error: {msg}", file=sys.stderr)
@@ -87,10 +90,10 @@ def ensure_submodules_for_flags(flags, quiet: bool):
         paths += SUBMODULES_BY_FLAG.get(flag, [])
         if flag.startswith("CUSTOM_MUTATOR_"):
             has_custom_mutator = True
-            
+
     if has_custom_mutator:
         paths.append("external/secp256k1")
-            
+
     # Deduplicate paths and preserve order
     paths = list(dict.fromkeys(paths))
     if not paths:
@@ -129,9 +132,11 @@ def build_module(flag: str, quiet: bool):
 
 
 def main():
+    os.chdir(REPO_ROOT)
+
     cxxflags = os.environ.get("CXXFLAGS")
     if not cxxflags:
-        die('CXXFLAGS not defined. Example: CXXFLAGS="-DLDK -DLND" ./auto_build.py')
+        die('CXXFLAGS not defined. Example: CXXFLAGS="-DLDK -DLND" ./scripts/auto_build.py')
 
     print("Cleaning previous builds...")
     run("make clean")

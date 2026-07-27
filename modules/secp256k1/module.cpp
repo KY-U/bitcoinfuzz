@@ -25,6 +25,11 @@ extern "C" {
 #define SECP256K1_MUSIG_NONCE_SER_LEN 66
 #define SECP256K1_MUSIG_PARTIAL_SIG_SER_LEN 32
 
+// Internal linkage: several modules define helpers with these names (init,
+// hex_encode, ...) and any two of them would otherwise collide at link time
+// when both modules are built into the same binary.
+namespace {
+
 secp256k1_context *secp256k1_ctx;
 
 void init(int *argc, char ***argv) {
@@ -460,6 +465,8 @@ std::optional<std::string> secp256k1_musig2_sign_session(
          partial_sigs_hex + ":" +
          hex_encode(final_sig.data(), final_sig.size());
 }
+
+} // namespace
 
 namespace bitcoinfuzz {
 namespace module {

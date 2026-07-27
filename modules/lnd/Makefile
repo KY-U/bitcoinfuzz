@@ -5,12 +5,12 @@ SYMBOL_PREFIX ?= lnd
 all: module.a
 
 module.a: module.o lnd_wrapper/liblnd_wrapper.a
-	bash ../../merge.sh module.a lnd_wrapper/liblnd_wrapper.a module.o
+	bash ../../scripts/merge.sh module.a lnd_wrapper/liblnd_wrapper.a module.o
 	ranlib module.a
 
 lnd_wrapper/liblnd_wrapper.a:
 	cd lnd_wrapper && go build -o liblnd_wrapper.a -buildmode=c-archive -tags=libfuzzer -gcflags=all=-d=libfuzzer wrapper.go
-	bash ../../rename_cgo_symbols.sh lnd_wrapper/liblnd_wrapper.a $(SYMBOL_PREFIX)
+	bash ../../scripts/rename_cgo_symbols.sh lnd_wrapper/liblnd_wrapper.a $(SYMBOL_PREFIX)
 
 golang: lnd_wrapper/liblnd_wrapper.a
 

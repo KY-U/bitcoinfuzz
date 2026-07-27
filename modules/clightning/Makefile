@@ -58,7 +58,7 @@ module.a: libcln.a secp256k1_symbols.map module.o
 	@echo "========================================"
 
 	# First merge using the existing script
-	bash ../../merge.sh module_temp.a libcln.a module.o
+	bash ../../scripts/merge.sh module_temp.a libcln.a module.o
 
 	# Apply selective symbol renaming (only secp256k1 symbols)
 	@echo "Extracting objects..."

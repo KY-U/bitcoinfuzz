@@ -3,7 +3,7 @@ CXXFLAGS += -Wall -Wextra -std=c++20 -I. -I ../../include -I./utreexo_wrapper
 all: module.a
 
 module.a: module.o utreexo_wrapper/libutreexo_wrapper.a
-	bash ../../merge.sh module.a utreexo_wrapper/libutreexo_wrapper.a module.o
+	bash ../../scripts/merge.sh module.a utreexo_wrapper/libutreexo_wrapper.a module.o
 	ranlib module.a
 
 utreexo_wrapper/libutreexo_wrapper.a:

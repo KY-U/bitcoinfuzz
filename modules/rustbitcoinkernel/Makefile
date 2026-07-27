@@ -54,7 +54,7 @@ rustbitcoinkernel_symbols.map: $(RUST_LIB_PATH)
 	@echo "Generated $$(wc -l < $@) symbol mappings"
 
 module.a: module.o $(RUST_LIB_PATH) rustbitcoinkernel_symbols.map
-	bash ../../merge.sh module_temp.a $(RUST_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module_temp.a $(RUST_LIB_PATH) module.o
 	$(OBJCOPY) --redefine-syms=rustbitcoinkernel_symbols.map module_temp.a module.a
 	rm -f module_temp.a
 	ranlib module.a

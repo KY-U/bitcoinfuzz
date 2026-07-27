@@ -107,7 +107,7 @@ RUN \
     --mount=type=cache,target=/root/.nuget/packages,id=fuzz-nuget-build \
     --mount=type=cache,target=/root/go/pkg/mod,id=fuzz-go-mod \
     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-$(dpkg --print-architecture) && \
-    /build/auto_build.py
+    /build/scripts/auto_build.py
 FROM base AS runner
 LABEL org.opencontainers.image.title="Bitcoin Fuzz"
 LABEL org.opencontainers.image.description="Bitcoin fuzzing framework for security testing Bitcoin implementations"

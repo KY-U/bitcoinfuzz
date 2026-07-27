@@ -25,12 +25,12 @@ $(SECP256K1_LIB):
 	$(MAKE)
 
 module.a: $(SECP256K1_LIB) module.o
-	bash ../../merge.sh module.a $(SECP256K1_LIB) module.o
+	bash ../../scripts/merge.sh module.a $(SECP256K1_LIB) module.o
 
 module.o: module.cpp module.h
 	$(CXX) $(CXXFLAGS) -I . -fPIC -c module.cpp -o module.o
 
-format: 
+format:
 	clang-format -i ./module.cpp ./module.h
 
 check-format:

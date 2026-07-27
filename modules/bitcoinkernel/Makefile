@@ -41,7 +41,7 @@ bitcoinkernel_symbols.map: $(KERNEL_LIB)
 	@echo "Generated $$(wc -l < $@) symbol mappings"
 
 module.a: $(KERNEL_LIB) bitcoinkernel_symbols.map module.o
-	bash ../../merge.sh module_temp.a $(KERNEL_LIB) module.o
+	bash ../../scripts/merge.sh module_temp.a $(KERNEL_LIB) module.o
 	$(OBJCOPY) --redefine-syms=bitcoinkernel_symbols.map module_temp.a module.a
 	rm -f module_temp.a
 	ranlib module.a

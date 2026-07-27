@@ -6,6 +6,10 @@ TARGET := $(shell rustc --print host-tuple)
 
 LDK_LIB_PATH := ./ldk_lib/target/$(TARGET)/release/libldk_lib.a
 
+# Namespace this module's vendored libsecp256k1 so it can be linked alongside
+# other Rust modules pinning the same secp256k1-sys version.
+SYMBOL_PREFIX ?= ldk
+
 $(LDK_LIB_PATH):
 	cd ldk_lib && \
 	RUSTFLAGS="\
@@ -21,7 +25,8 @@ $(LDK_LIB_PATH):
 cargo: $(LDK_LIB_PATH)
 
 module.a: module.o $(LDK_LIB_PATH)
-	bash ../../merge.sh module.a $(LDK_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module.a $(LDK_LIB_PATH) module.o
+	bash ../../scripts/rename_rust_secp_symbols.sh module.a $(SYMBOL_PREFIX)
 	ranlib module.a
 
 module.o: module.cpp module.h

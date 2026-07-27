@@ -18,7 +18,7 @@ $(RUSTREEXO_LIB_PATH):
 cargo: $(RUSTREEXO_LIB_PATH)
 
 module.a: module.o $(RUSTREEXO_LIB_PATH)
-	bash ../../merge.sh module.a $(RUSTREEXO_LIB_PATH) module.o
+	bash ../../scripts/merge.sh module.a $(RUSTREEXO_LIB_PATH) module.o
 	ranlib module.a
 
 module.o: module.cpp module.h
