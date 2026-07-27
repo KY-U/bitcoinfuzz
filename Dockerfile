@@ -145,6 +145,15 @@ COPY --from=builder --parents \
 # from the website https://llvm.org/docs/LibFuzzer.html#options
 # mkdir to init and make sure we have write permissions
 #
+# LIBFUZZ_DETECT_LEAKS drives both libFuzzer's -detect_leaks and ASan's
+# atexit leak check, and defaults to off whenever -fork is on. The two are
+# separate knobs: -detect_leaks=0 only disables libFuzzer's per-input leak
+# attribution, so ASan would still run LSan at exit. Fork children exit every
+# time slice, so a one-time library init allocation gets reported on every
+# child exit; the parent counts each as a crash and saves an empty
+# crash-da39a3ee... artifact (SHA1 of no input) that replays as a no-op.
+# Without -fork the process never exits, so the check never fires. Hunt leaks
+# in a dedicated LIBFUZZ_FORK=0 run; an explicit ASAN_OPTIONS still wins.
 ENTRYPOINT if [ -z "${FUZZ}" ]; then \
     echo "FUZZ environment variable must be set" >&2; \
     exit 1; \
@@ -152,6 +161,10 @@ ENTRYPOINT if [ -z "${FUZZ}" ]; then \
     && FUZZ_DATADIR="${FUZZ_DATADIR:-${FUZZ_DATAROOT}/${FUZZ}}" \
     && mkdir -p $FUZZ_DATADIR/crash \
     $FUZZ_DATADIR/corpus \
+    && LIBFUZZ_FORK_VALUE="${LIBFUZZ_FORK:-$(awk 'NR==1 { n=int($1/$2); if (n < 1) exit 1; print n }' /sys/fs/cgroup/cpu.max 2>/dev/null || nproc)}" \
+    && if [ "${LIBFUZZ_FORK_VALUE}" = "0" ]; then LEAK_DEFAULT=1; else LEAK_DEFAULT=0; fi \
+    && LIBFUZZ_DETECT_LEAKS_VALUE="${LIBFUZZ_DETECT_LEAKS:-${LEAK_DEFAULT}}" \
+    && export ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=${LIBFUZZ_DETECT_LEAKS_VALUE}}" \
     && exec /app/bitcoinfuzz \
     -artifact_prefix=${FUZZ_DATADIR}/crash/ \
     -merge_control_file=${FUZZ_DATADIR}/merge \
@@ -169,11 +182,11 @@ ENTRYPOINT if [ -z "${FUZZ}" ]; then \
     $( [ -n "${LIBFUZZ_MINIMIZE_CRASH}" ] && echo "-minimize_crash=${LIBFUZZ_MINIMIZE_CRASH}" ) \
     -reload=${LIBFUZZ_RELOAD:-1} \
     -jobs=${LIBFUZZ_JOBS:-0} \
-    -fork=${LIBFUZZ_FORK:-$(awk 'NR==1 { n=int($1/$2); if (n < 1) exit 1; print n }' /sys/fs/cgroup/cpu.max 2>/dev/null || nproc)} \
+    -fork=${LIBFUZZ_FORK_VALUE} \
     $( [ -n "${LIBFUZZ_WORKERS}" ] && echo "-workers=${LIBFUZZ_WORKERS}" ) \
     -reduce_inputs=${LIBFUZZ_REDUCE_INPUTS:-1} \
     -print_pcs=${LIBFUZZ_PRINT_PCS:-0} \
     -print_final_stats=${LIBFUZZ_PRINT_FINAL_STATS:-1} \
-    -detect_leaks=${LIBFUZZ_DETECT_LEAKS:-1} \
+    -detect_leaks=${LIBFUZZ_DETECT_LEAKS_VALUE} \
     -only_ascii=${LIBFUZZ_ONLY_ASCII:-0} \
     ${FUZZ_DATADIR}/corpus
