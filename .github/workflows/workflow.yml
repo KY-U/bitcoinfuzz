@@ -137,9 +137,10 @@ jobs:
           ONLY_MODULES=1 \
           ./scripts/auto_build.py
 
-      - name: Cache build artifacts
-        uses: actions/cache/save@v4
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
         with:
+          name: bitcoinfuzz-build
           path: |
             modules/
             custommutator/
@@ -149,7 +150,9 @@ jobs:
             NBitcoinSecp256k1.CppBridge.so
             build.env
             external/secp256k1/include/
-          key: bitcoinfuzz-build-${{ matrix.os }}-${{ github.sha }}-${{ github.run_id }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
 
   test:
     needs: build
@@ -303,10 +306,6 @@ jobs:
         uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-test-env
-        with:
-          os: ${{ matrix.os }}
-          github-sha: ${{ github.sha }}
-          github-run-id: ${{ github.run_id }}
 
       - name: Load environment variables
         run: |
