@@ -1,15 +1,5 @@
 name: Setup Test Environment
-description: Sets up the environment for a test job, including repo checkout, cache restore.
-inputs:
-  os:
-    description: Operating system
-    required: true
-  github-sha:
-    description: GitHub SHA
-    required: true
-  github-run-id:
-    description: GitHub Run ID
-    required: true
+description: Sets up the environment for a test job, including build artifact download.
 runs:
   using: "composite"
   steps:
@@ -18,19 +8,11 @@ runs:
       with:
         repository: bitcoinfuzz/corpora
         path: corpora
-    - name: Restore build artifacts
-      uses: actions/cache/restore@v4
+    - name: Download build artifacts
+      uses: actions/download-artifact@v8
       with:
-        path: |
-          modules/
-          custommutator/
-          bitcoinfuzz
-          NBitcoin.CppBridge.so
-          NBitcoin.CppBridge.dylib
-          NBitcoinSecp256k1.CppBridge.so
-          build.env
-          external/secp256k1/include/
-        key: bitcoinfuzz-build-${{ inputs.os }}-${{ inputs.github-sha }}-${{ inputs.github-run-id }}
+        name: bitcoinfuzz-build
+        path: .
     - name: Setup environment
       shell: bash
       run: |
