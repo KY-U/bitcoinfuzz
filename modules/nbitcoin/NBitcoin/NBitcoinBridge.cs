@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using NBitcoin.Scripting;
 using NBitcoin.Secp256k1;
 using NBitcoin.WalletPolicies;
 
