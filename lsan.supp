@@ -44,3 +44,5 @@ leak:Unsafe_AllocateMemory0
 # JFR (Java Flight Recorder) instruments classes during loading; the transformed
 # bytecode buffer is owned by the JVM class subsystem — not a real leak.
 leak:JfrEventClassTransformer::
+# .NET NativeAOT process-lifetime WaitSubsystem monitor
+leak:S_P_CoreLib_System_Threading_WaitSubsystem___cctor
