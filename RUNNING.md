@@ -245,3 +245,90 @@ accept/reject mismatches between `BITCOIN_CORE` and `BITCOINERLAB_MINISCRIPT`
 or `NBITCOIN` are often expected parser-policy differences rather than bugs in
 the miniscript implementation. Pairing modules with similar permissiveness makes
 crashes and result mismatches easier to interpret.
+
+## Reproducing Crashes
+
+When libFuzzer finds a crash it writes the input to `-artifact_prefix`, which the
+entrypoint points at `/app/data/<target>/crash/`. With the default bind mount that is
+`./docker/<target>/crash/crash-<sha1>` on the host.
+
+> [!IMPORTANT]
+> The entrypoint always appends `${FUZZ_DATADIR}/corpus` as the last positional argument,
+> so adding a crash file to a normal `docker run` does **not** replay it — libFuzzer keeps
+> fuzzing and treats the extra path as another corpus entry. Override the entrypoint to run
+> the binary directly.
+
+```bash
+docker run --rm \
+  -e FUZZ=verify_script \
+  -e MODULES="LIBBITCOIN_SYSTEM,BITCOIN_CORE" \
+  -v "$(pwd)/docker":/app/data \
+  --entrypoint /app/bitcoinfuzz \
+  bitcoinfuzz:verify_script \
+  /app/data/verify_script/crash/crash-<sha1>
+```
+
+Given a file instead of a directory, libFuzzer executes that single input once and prints
+the stack trace, then exits. Two things matter for the crash to reappear:
+
+- **Use the same `MODULES` value as the fuzzing run.** Differential targets abort on a
+  mismatch between implementations, so a different module set (or a set of one) will not
+  reproduce it.
+- **Do not pass `-fork`.** Overriding the entrypoint drops all the `LIBFUZZ_*` flags,
+  including fork mode, which is what you want: `-fork` hides the stack trace in the child
+  process. Re-add individual flags only if the crash depends on them (`-rss_limit_mb` for
+  an OOM, `-timeout` for a hang, `-detect_leaks=1` for a leak).
+
+For a differential mismatch rather than a segfault or assert, add `-e LOG_OUTPUTS=1` to
+print each module's output and see which implementations disagree:
+
+```bash
+docker run --rm \
+  -e FUZZ=verify_script \
+  -e MODULES="LIBBITCOIN_SYSTEM,BITCOIN_CORE" \
+  -e LOG_OUTPUTS=1 \
+  -v "$(pwd)/docker":/app/data \
+  --entrypoint /app/bitcoinfuzz \
+  bitcoinfuzz:verify_script \
+  /app/data/verify_script/crash/crash-<sha1>
+```
+
+### Minimizing a crash
+
+Shrink the input before filing a bug report. The result is written next to the original as
+`minimized-from-<sha1>`:
+
+```bash
+docker run --rm \
+  -e FUZZ=verify_script \
+  -e MODULES="LIBBITCOIN_SYSTEM,BITCOIN_CORE" \
+  -v "$(pwd)/docker":/app/data \
+  --entrypoint /app/bitcoinfuzz \
+  bitcoinfuzz:verify_script \
+  -minimize_crash=1 -runs=100000 \
+  -artifact_prefix=/app/data/verify_script/crash/ \
+  /app/data/verify_script/crash/crash-<sha1>
+```
+
+> [!NOTE]
+> The image must have been built with the union of the `-D<MODULE>` flags for every module
+> in `MODULES`, since `CXXFLAGS` is build-time only. Reproduce with the same image that
+> produced the crash; rebuilding with different build args can make it disappear.
+
+### Reproducing AFL++ crashes
+
+AFL++ stores crashing inputs under `/app/data/<target>/out/default/crashes/` (`./docker-afl/...`
+on the host). The AFL image is built with `-fsanitize=fuzzer`, so `/app/bitcoinfuzz` accepts
+an input file the same way:
+
+```bash
+docker run --rm \
+  -e FUZZ=verify_script \
+  -e MODULES="BITCOIN_CORE,BTCD,LIBBITCOIN_SYSTEM" \
+  -v "$(pwd)/docker-afl":/app/data \
+  --entrypoint /app/bitcoinfuzz \
+  bitcoinfuzz-afl:verify_script \
+  '/app/data/verify_script/out/default/crashes/id:000000,sig:06,src:000000,...'
+```
+
+Quote the path - AFL++ crash filenames contain commas and colons.
