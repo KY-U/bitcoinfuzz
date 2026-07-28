@@ -148,7 +148,7 @@ jobs:
             NBitcoin.CppBridge.dylib
             NBitcoinSecp256k1.CppBridge.so
             build.env
-            external/secp256k1/include/secp256k1.h
+            external/secp256k1/include/
           key: bitcoinfuzz-build-${{ matrix.os }}-${{ github.sha }}-${{ github.run_id }}
 
   test:
@@ -256,8 +256,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "bip32_deserialize_extended_key_clean"
             target: "bip32_deserialize_extended_key"
-            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBITCOINJ -DLIBWALLY_CORE -DEMBIT -DPYCOIN -DBITCOINS -DBTCD -DCUSTOM_MUTATOR_EXTENDED_KEY"
-            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBITCOINJ -DLIBWALLY_CORE -DEMBIT -DPYCOIN -DBITCOINS -DCUSTOM_MUTATOR_EXTENDED_KEY -DLIBBITCOIN_SYSTEM"
+            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBITCOINJ -DLIBWALLY_CORE -DEMBIT -DPYCOIN -DBITCOINS -DBTCD -DCUSTOM_MUTATOR_EXTENDED_KEY -DLIBBITCOIN_SYSTEM"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
             setup_java: "true"
           - corpus: "transaction_eval"
