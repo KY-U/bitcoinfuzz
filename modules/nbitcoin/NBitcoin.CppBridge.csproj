@@ -20,6 +20,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NBitcoin.Bitcoinfuzz" Version="9.0.5-custom" />
+    <PackageReference Include="NBitcoin.Bitcoinfuzz" Version="10.0.0" />
   </ItemGroup>
 </Project>
