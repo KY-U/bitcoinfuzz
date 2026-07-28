@@ -187,8 +187,14 @@ public static class Bridge
     [UnmanagedCallersOnly(EntryPoint = "nbitcoin_bip32_master_keygen")]
     public static IntPtr BIP32MasterKeygen(IntPtr dataPtr, UIntPtr len)
     {
-        var seed = new byte[(int)len];
-        Marshal.Copy(dataPtr, seed, 0, (int)len);
+        ulong seedLength = len.ToUInt64();
+        if (seedLength < 16 || seedLength > 64)
+        {
+            return IntPtr.Zero;
+        }
+
+        var seed = new byte[(int)seedLength];
+        Marshal.Copy(dataPtr, seed, 0, seed.Length);
         ExtKey sk = ExtKey.CreateFromSeed(seed);
         IntPtr strPtr = Marshal.StringToHGlobalAnsi(sk.GetWif(Network.Main).ToString());
         return strPtr;
