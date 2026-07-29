@@ -89,6 +89,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "chacha20-poly1305"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad28386ab70dd960294556a76aaab6da2994fec47d650fd725b3012f062052a"
+
+[[package]]
 name = "dnssec-prover"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,24 +160,24 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 [[package]]
 name = "lightning"
 version = "0.3.0+git"
-source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=4cbe4eb5ad9b03acc955b146ed7280325acc9987#4cbe4eb5ad9b03acc955b146ed7280325acc9987"
+source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=e2fa4dedfba74631b0da1b1546976abcc46f9ade#e2fa4dedfba74631b0da1b1546976abcc46f9ade"
 dependencies = [
  "bech32",
  "bitcoin",
+ "chacha20-poly1305",
  "dnssec-prover",
  "hashbrown",
  "libm",
  "lightning-invoice",
  "lightning-macros",
  "lightning-types",
- "musig2",
  "possiblyrandom",
 ]
 
 [[package]]
 name = "lightning-invoice"
 version = "0.35.0+git"
-source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=4cbe4eb5ad9b03acc955b146ed7280325acc9987#4cbe4eb5ad9b03acc955b146ed7280325acc9987"
+source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=e2fa4dedfba74631b0da1b1546976abcc46f9ade#e2fa4dedfba74631b0da1b1546976abcc46f9ade"
 dependencies = [
  "bech32",
  "bitcoin",
@@ -181,7 +187,7 @@ dependencies = [
 [[package]]
 name = "lightning-macros"
 version = "0.2.2+git"
-source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=4cbe4eb5ad9b03acc955b146ed7280325acc9987#4cbe4eb5ad9b03acc955b146ed7280325acc9987"
+source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=e2fa4dedfba74631b0da1b1546976abcc46f9ade#e2fa4dedfba74631b0da1b1546976abcc46f9ade"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -191,15 +197,7 @@ dependencies = [
 [[package]]
 name = "lightning-types"
 version = "0.4.0+git"
-source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=4cbe4eb5ad9b03acc955b146ed7280325acc9987#4cbe4eb5ad9b03acc955b146ed7280325acc9987"
-dependencies = [
- "bitcoin",
-]
-
-[[package]]
-name = "musig2"
-version = "0.1.0"
-source = "git+https://github.com/arik-so/rust-musig2?rev=6f95a05718cbb44d8fe3fa6021aea8117aa38d50#6f95a05718cbb44d8fe3fa6021aea8117aa38d50"
+source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=e2fa4dedfba74631b0da1b1546976abcc46f9ade#e2fa4dedfba74631b0da1b1546976abcc46f9ade"
 dependencies = [
  "bitcoin",
 ]
@@ -207,7 +205,7 @@ dependencies = [
 [[package]]
 name = "possiblyrandom"
 version = "0.2.0"
-source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=4cbe4eb5ad9b03acc955b146ed7280325acc9987#4cbe4eb5ad9b03acc955b146ed7280325acc9987"
+source = "git+https://github.com/bitcoinfuzz/rust-lightning.git?rev=e2fa4dedfba74631b0da1b1546976abcc46f9ade#e2fa4dedfba74631b0da1b1546976abcc46f9ade"
 dependencies = [
  "getrandom",
 ]

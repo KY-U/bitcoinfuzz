@@ -67,10 +67,7 @@ pub unsafe extern "C" fn ldk_des_invoice(input: *const std::os::raw::c_char) -> 
                 result.push_str(&metadata.to_hex_string(Case::Lower));
             }
 
-            let invoice_payee_pub_key = match invoice.payee_pub_key() {
-                Some(payee) => payee.clone(),
-                None => invoice.recover_payee_pub_key(),
-            };
+            let invoice_payee_pub_key = invoice.get_payee_pub_key();
 
             result.push_str(";RECIPIENT=");
             result.push_str(&invoice_payee_pub_key.to_string());
