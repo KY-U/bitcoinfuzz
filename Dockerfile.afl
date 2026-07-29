@@ -54,7 +54,7 @@ ENV PATH="/usr/local/go/bin:$PATH"
 RUN rustup set profile minimal && rustup default nightly
 RUN curl -sSf -L -o dotnet-install.sh https://dot.net/v1/dotnet-install.sh && \
     chmod +x dotnet-install.sh && \
-    ./dotnet-install.sh --channel 9.0 --install-dir /usr/local/share/dotnet && \
+    ./dotnet-install.sh --channel 10.0 --install-dir /usr/local/share/dotnet && \
     rm dotnet-install.sh && \
     ln -vs /usr/local/share/dotnet/dotnet /usr/local/bin/dotnet && \
     dotnet --info

@@ -51,11 +51,11 @@ RUN curl -sSfL https://go.dev/dl/go1.25.10.linux-amd64.tar.gz | tar -C /usr/loca
 ENV PATH="/usr/local/go/bin:$PATH"
 # Keep Rust nightly scoped to the builder image instead of mutating a host toolchain.
 RUN rustup set profile minimal && rustup default nightly
-# Install .NET SDK 9.0 using Microsoft's install script
+# Install .NET SDK 10.0 using Microsoft's install script
 # See https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-install-script
 RUN curl -sSf -L -o dotnet-install.sh https://dot.net/v1/dotnet-install.sh && \
     chmod +x dotnet-install.sh && \
-    ./dotnet-install.sh --channel 9.0 --install-dir /usr/local/share/dotnet && \
+    ./dotnet-install.sh --channel 10.0 --install-dir /usr/local/share/dotnet && \
     rm dotnet-install.sh && \
     ln -vs /usr/local/share/dotnet/dotnet /usr/local/bin/dotnet && \
     dotnet --info
