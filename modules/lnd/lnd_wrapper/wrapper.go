@@ -9,7 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 
 	/*
 	   #include <stdint.h>
@@ -603,7 +603,7 @@ func LndDecodeOnion(data *C.char, length C.int) *C.char {
 		if processedPacket.Action == sphinx.MoreHops {
 			sb.WriteString(fmt.Sprintf(";SHORT_CHANNEL_ID=%d", payload.FwdInfo.NextHop.ToUint64()))
 		}
-		sb.WriteString(fmt.Sprintf(";OUTGOING_CLTV_VALUE=%d", payload.FwdInfo.OutgoingCTLV))
+		sb.WriteString(fmt.Sprintf(";OUTGOING_CLTV_VALUE=%d", payload.FwdInfo.OutgoingCLTV))
 
 		if payload.CustomRecords().IsKeysend() {
 			preimage, err := lntypes.MakePreimage(payload.CustomRecords()[record.KeySendType])
