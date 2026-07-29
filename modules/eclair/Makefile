@@ -29,7 +29,8 @@ eclair.zip:
 	@echo "Building eclair in $(ECLAIR_DIR)..."
 	cd $(ECLAIR_DIR) && ./mvnw package -pl eclair-node -am -Dmaven.test.skip=true -DskipTests
 
-	@ECLAIR_ZIP_BUILD=$$(find $(ECLAIR_DIR)/eclair-node/target -name "eclair-node*.zip" | head -n 1); \
+	@# Old builds linger in target/, so pick the newest zip rather than an arbitrary one.
+	@ECLAIR_ZIP_BUILD=$$(find $(ECLAIR_DIR)/eclair-node/target -name "eclair-node*.zip" -printf '%T@ %p\n' | sort -rn | head -n 1 | cut -d' ' -f2-); \
 	echo "Copying $$ECLAIR_ZIP_BUILD to eclair.zip..."; \
 	cp $$ECLAIR_ZIP_BUILD eclair.zip
 
