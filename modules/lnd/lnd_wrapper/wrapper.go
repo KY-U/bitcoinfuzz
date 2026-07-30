@@ -188,10 +188,12 @@ func LndParseP2pLightningMessage(data *C.char, length C.int) *C.char {
 		sb.WriteString(";DATA=")
 		sb.WriteString(fmt.Sprintf("%x", message.(*lnwire.Error).Data))
 	case 18:
-		sb.WriteString("MSG_TYPE=ping;NUM_PONG_BYTES=")
-		sb.WriteString(fmt.Sprintf("%d", message.(*lnwire.Ping).NumPongBytes))
-		sb.WriteString(";IGNORED=")
-		sb.WriteString(fmt.Sprintf("%d", len(message.(*lnwire.Ping).PaddingBytes)))
+		msg := message.(*lnwire.Ping)
+		if msg.NumPongBytes > lnwire.MaxPongBytes {
+			return C.CString("")
+		}
+		fmt.Fprintf(&sb, "MSG_TYPE=ping;NUM_PONG_BYTES=%d", msg.NumPongBytes)
+		fmt.Fprintf(&sb, ";IGNORED=%d", len(msg.PaddingBytes))
 	case 19:
 		sb.WriteString("MSG_TYPE=pong;IGNORED=")
 		sb.WriteString(fmt.Sprintf("%d", len(message.(*lnwire.Pong).PongBytes)))
