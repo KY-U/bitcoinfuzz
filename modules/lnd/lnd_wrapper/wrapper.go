@@ -9,7 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/v2"
 
 	/*
 	   #include <stdint.h>
@@ -188,10 +188,12 @@ func LndParseP2pLightningMessage(data *C.char, length C.int) *C.char {
 		sb.WriteString(";DATA=")
 		sb.WriteString(fmt.Sprintf("%x", message.(*lnwire.Error).Data))
 	case 18:
-		sb.WriteString("MSG_TYPE=ping;NUM_PONG_BYTES=")
-		sb.WriteString(fmt.Sprintf("%d", message.(*lnwire.Ping).NumPongBytes))
-		sb.WriteString(";IGNORED=")
-		sb.WriteString(fmt.Sprintf("%d", len(message.(*lnwire.Ping).PaddingBytes)))
+		msg := message.(*lnwire.Ping)
+		if msg.NumPongBytes > lnwire.MaxPongBytes {
+			return C.CString("")
+		}
+		fmt.Fprintf(&sb, "MSG_TYPE=ping;NUM_PONG_BYTES=%d", msg.NumPongBytes)
+		fmt.Fprintf(&sb, ";IGNORED=%d", len(msg.PaddingBytes))
 	case 19:
 		sb.WriteString("MSG_TYPE=pong;IGNORED=")
 		sb.WriteString(fmt.Sprintf("%d", len(message.(*lnwire.Pong).PongBytes)))
@@ -603,7 +605,7 @@ func LndDecodeOnion(data *C.char, length C.int) *C.char {
 		if processedPacket.Action == sphinx.MoreHops {
 			sb.WriteString(fmt.Sprintf(";SHORT_CHANNEL_ID=%d", payload.FwdInfo.NextHop.ToUint64()))
 		}
-		sb.WriteString(fmt.Sprintf(";OUTGOING_CLTV_VALUE=%d", payload.FwdInfo.OutgoingCTLV))
+		sb.WriteString(fmt.Sprintf(";OUTGOING_CLTV_VALUE=%d", payload.FwdInfo.OutgoingCLTV))
 
 		if payload.CustomRecords().IsKeysend() {
 			preimage, err := lntypes.MakePreimage(payload.CustomRecords()[record.KeySendType])

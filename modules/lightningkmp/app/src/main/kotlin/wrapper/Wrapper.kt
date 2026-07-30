@@ -94,7 +94,7 @@ object Wrapper {
             append(";ABSOLUTE_EXPIRY=${offer.expirySeconds ?: ""}")
             offer.paths?.forEachIndexed { i, path ->
                 path.route.blindedHops.forEachIndexed { _, hop ->
-                    append(";PATH_${i}_HOP=${hop.blindedPublicKey ?: ""}")
+                    append(";PATH_${i}_HOP=${hop.blindedPublicKey}")
                 }
             }
             append(";ISSUER=${offer.issuer ?: ""}")

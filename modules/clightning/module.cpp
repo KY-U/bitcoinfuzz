@@ -85,7 +85,7 @@ int ecdh(const struct pubkey *point, struct secret *ss) {
 std::optional<std::string> clightning_des_invoice(const std::string &input) {
   CleanTmpCtxGuard _cleanup;
 
-  char *fail = nullptr;
+  const char *fail = nullptr;
   const struct chainparams *params = chainparams_for_network("bitcoin");
 
   struct bolt11 *invoice =
@@ -152,9 +152,11 @@ std::optional<std::string> clightning_des_invoice(const std::string &input) {
     // Use only the first fallback address for compatibility with LND,
     // which ignores additional fallback fields.
     // See: https://github.com/lightningnetwork/lnd/issues/9591
-    std::string addr =
-        encode_scriptpubkey_to_addr(tmpctx, params, invoice->fallbacks[0]);
-    result << addr;
+    const char *addr =
+        encode_scriptpubkey_to_addr(tmpctx, params, invoice->fallbacks[0],
+                                    tal_bytelen(invoice->fallbacks[0]));
+    if (addr)
+      result << addr;
   }
 
   if (invoice->routes) {
@@ -196,7 +198,7 @@ std::optional<std::string> clightning_des_invoice(const std::string &input) {
 std::string clightning_des_offer(const std::string_view input) {
   CleanTmpCtxGuard _cleanup;
 
-  char *fail = nullptr;
+  const char *fail = nullptr;
 
   // Get the truncated length of the string (in case it contains null bytes)
   size_t c_string_len = strnlen(input.data(), input.size());

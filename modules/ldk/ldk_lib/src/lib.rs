@@ -67,10 +67,7 @@ pub unsafe extern "C" fn ldk_des_invoice(input: *const std::os::raw::c_char) -> 
                 result.push_str(&metadata.to_hex_string(Case::Lower));
             }
 
-            let invoice_payee_pub_key = match invoice.payee_pub_key() {
-                Some(payee) => payee.clone(),
-                None => invoice.recover_payee_pub_key(),
-            };
+            let invoice_payee_pub_key = invoice.get_payee_pub_key();
 
             result.push_str(";RECIPIENT=");
             result.push_str(&invoice_payee_pub_key.to_string());
@@ -311,8 +308,8 @@ pub unsafe extern "C" fn ldk_parse_p2p_lightning_message(
                 let mut result = format!("MSG_TYPE=init;FEATURES={}", flags.to_lower_hex_string());
 
                 if let Some(networks) = init.networks {
+                    result.push_str(";NETWORKS=");
                     if !networks.is_empty() {
-                        result.push_str(";NETWORKS=");
                         networks.iter().for_each(|network| {
                             result.push_str(&format!("{},", network.to_string()));
                         });
