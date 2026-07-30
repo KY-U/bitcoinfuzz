@@ -308,8 +308,8 @@ pub unsafe extern "C" fn ldk_parse_p2p_lightning_message(
                 let mut result = format!("MSG_TYPE=init;FEATURES={}", flags.to_lower_hex_string());
 
                 if let Some(networks) = init.networks {
+                    result.push_str(";NETWORKS=");
                     if !networks.is_empty() {
-                        result.push_str(";NETWORKS=");
                         networks.iter().for_each(|network| {
                             result.push_str(&format!("{},", network.to_string()));
                         });
