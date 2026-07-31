@@ -6,10 +6,12 @@ import org.bitcoins.core.crypto.ExtPrivateKey$;
 import org.bitcoins.core.crypto.ExtPublicKey;
 import org.bitcoins.core.hd.BIP32Path;
 import org.bitcoins.core.hd.BIP32Path$;
+import org.bitcoins.core.protocol.script.Script;
 import org.bitcoins.core.protocol.transaction.Transaction;
 import org.bitcoins.core.protocol.transaction.TransactionInput;
 import org.bitcoins.core.protocol.transaction.TransactionOutput;
 import org.bitcoins.core.psbt.InputPSBTMap;
+import org.bitcoins.core.psbt.OutputPSBTMap;
 import org.bitcoins.core.psbt.PSBT;
 import org.bitcoins.core.psbt.PSBT$;
 import scala.util.Try;
@@ -109,6 +111,61 @@ public class BitcoinSWrapper {
             .append("sigs=")
             .append(inp.partialSignatures().size())
             .append(";");
+
+        // .hex() on a script includes bitcoin-s's own compact-size length
+        // prefix; .asmHex() is the raw script bytes, matching the other
+        // modules' HexStr(script)-style output.
+        String redeemScriptHex =
+            inp.redeemScriptOpt().isDefined()
+                ? inp.redeemScriptOpt().get().redeemScript().asmHex()
+                : "";
+        sb.append("in").append(i).append("rs=").append(redeemScriptHex).append(";");
+
+        // witnessScript() is typed as RawScriptPubKey, an interface that
+        // doesn't itself expose asmHex() to Java; cast to Script (every
+        // concrete implementation extends it) to reach it.
+        String witnessScriptHex =
+            inp.witnessScriptOpt().isDefined()
+                ? ((Script) inp.witnessScriptOpt().get().witnessScript()).asmHex()
+                : "";
+        sb.append("in").append(i).append("ws=").append(witnessScriptHex).append(";");
+
+        // raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset. HashType.num() is a
+        // signed Java int holding the raw 4 bytes, so any value with the top
+        // bit set (e.g. 0xfe8f263f) would render negative, while every other
+        // module formats it unsigned (Bitcoin Core casts to uint32_t, btcd to
+        // uint32, rust-psbt uses to_u32). Print it unsigned to match.
+        int sighash =
+            inp.sigHashTypeOpt().isDefined() ? inp.sigHashTypeOpt().get().hashType().num() : 0;
+        sb.append("in")
+            .append(i)
+            .append("sh=")
+            .append(Integer.toUnsignedString(sighash))
+            .append(";");
+
+        sb.append("in")
+            .append(i)
+            .append("bip32=")
+            .append(inp.BIP32DerivationPaths().length())
+            .append(";");
+
+        // Report finalization on a *non-empty* final scriptSig/scriptWitness
+        // rather than mere presence, which is what isFinalized() checks.
+        // Bitcoin Core stores its final witness as a plain CScriptWitness whose
+        // IsNull() is just stack.empty(), so it cannot distinguish an absent
+        // PSBT_IN_FINAL_SCRIPTWITNESS key from one present with a zero-item
+        // stack; presence-based semantics would make this flag incomparable
+        // across modules for that degenerate input. An empty witness finalizes
+        // nothing anyway.
+        boolean finalizedScriptSig =
+            inp.finalizedScriptSigOpt().isDefined()
+                && !((Script) inp.finalizedScriptSigOpt().get().scriptSig()).asmHex().isEmpty();
+        boolean finalizedScriptWitness =
+            inp.finalizedScriptWitnessOpt().isDefined()
+                && !inp.finalizedScriptWitnessOpt().get().scriptWitness().stack().isEmpty();
+        if (finalizedScriptSig || finalizedScriptWitness) {
+          sb.append("in").append(i).append("fin=1;");
+        }
       }
 
       scala.collection.immutable.Seq<?> outputs = tx.outputs();
@@ -119,7 +176,33 @@ public class BitcoinSWrapper {
             .append("val=")
             .append(txOut.value().satoshis().toLong())
             .append(";");
-        sb.append("out").append(i).append("script=").append(txOut.scriptPubKey().hex()).append(";");
+        sb.append("out")
+            .append(i)
+            .append("script=")
+            .append(txOut.scriptPubKey().asmHex())
+            .append(";");
+
+        if (i < psbt.outputMaps().length()) {
+          OutputPSBTMap out = (OutputPSBTMap) psbt.outputMaps().apply(i);
+
+          String outRedeemScriptHex =
+              out.redeemScriptOpt().isDefined()
+                  ? out.redeemScriptOpt().get().redeemScript().asmHex()
+                  : "";
+          sb.append("out").append(i).append("rs=").append(outRedeemScriptHex).append(";");
+
+          String outWitnessScriptHex =
+              out.witnessScriptOpt().isDefined()
+                  ? out.witnessScriptOpt().get().witnessScript().asmHex()
+                  : "";
+          sb.append("out").append(i).append("ws=").append(outWitnessScriptHex).append(";");
+
+          sb.append("out")
+              .append(i)
+              .append("bip32=")
+              .append(out.BIP32DerivationPaths().length())
+              .append(";");
+        }
       }
 
       return sb.toString();

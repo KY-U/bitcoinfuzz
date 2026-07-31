@@ -47,16 +47,13 @@ def psbt_parse(data):
             # check utxo
             psbt_input = psbt_obj.inputs[i]
             has_utxo = (
-                1
-                if (
-                    hasattr(psbt_input, "witness_utxo")
-                    and psbt_input.witness_utxo is not None
-                    or hasattr(psbt_input, "non_witness_utxo")
-                    and psbt_input.non_witness_utxo is not None
-                )
-                else 0
+                hasattr(psbt_input, "witness_utxo")
+                and psbt_input.witness_utxo is not None
+                or hasattr(psbt_input, "non_witness_utxo")
+                and psbt_input.non_witness_utxo is not None
             )
-            result.append(f"in{i}utxo={has_utxo}")
+            if has_utxo:
+                result.append(f"in{i}utxo=1")
 
             # count sig
             sig_count = (
@@ -66,9 +63,63 @@ def psbt_parse(data):
             )
             result.append(f"in{i}sigs={sig_count}")
 
+            redeem_script_hex = (
+                psbt_input.redeem_script.data.hex()
+                if psbt_input.redeem_script is not None
+                else ""
+            )
+            result.append(f"in{i}rs={redeem_script_hex}")
+
+            witness_script_hex = (
+                psbt_input.witness_script.data.hex()
+                if psbt_input.witness_script is not None
+                else ""
+            )
+            result.append(f"in{i}ws={witness_script_hex}")
+
+            # raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset
+            sighash = (
+                psbt_input.sighash_type if psbt_input.sighash_type is not None else 0
+            )
+            result.append(f"in{i}sh={sighash}")
+
+            result.append(f"in{i}bip32={len(psbt_input.bip32_derivations)}")
+
+            # Report finalization on *non-empty* final scriptSig/scriptWitness
+            # rather than mere presence. Bitcoin Core stores the final witness
+            # as a plain CScriptWitness whose IsNull() is just stack.empty(),
+            # so it cannot tell an absent PSBT_IN_FINAL_SCRIPTWITNESS key from
+            # one present with a zero-item stack; presence-based semantics
+            # would make this flag incomparable across modules for that
+            # degenerate input. An empty witness finalizes nothing anyway.
+            final_scriptsig = psbt_input.final_scriptsig
+            final_scriptwitness = psbt_input.final_scriptwitness
+            if (final_scriptsig is not None and len(final_scriptsig.data) > 0) or (
+                final_scriptwitness is not None and len(final_scriptwitness.items) > 0
+            ):
+                result.append(f"in{i}fin=1")
+
         for i, vout in enumerate(tx.vout):
             result.append(f"out{i}val={vout.value}")
-            result.append(f"out{i}script={vout.scriptpubkey.hex()}")
+            result.append(f"out{i}script={vout.script_pubkey.data.hex()}")
+
+            psbt_output = psbt_obj.outputs[i]
+
+            redeem_script_hex = (
+                psbt_output.redeem_script.data.hex()
+                if psbt_output.redeem_script is not None
+                else ""
+            )
+            result.append(f"out{i}rs={redeem_script_hex}")
+
+            witness_script_hex = (
+                psbt_output.witness_script.data.hex()
+                if psbt_output.witness_script is not None
+                else ""
+            )
+            result.append(f"out{i}ws={witness_script_hex}")
+
+            result.append(f"out{i}bip32={len(psbt_output.bip32_derivations)}")
 
         return ";".join(result) + ";"
     except Exception as _:

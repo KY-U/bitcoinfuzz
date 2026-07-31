@@ -253,6 +253,25 @@ func BTCDTransactionEval(data C.ByteArray) *C.char {
 	return C.CString(res)
 }
 
+// finalWitnessHasItems reports whether a PSBT_IN_FINAL_SCRIPTWITNESS value
+// holds at least one witness item. btcd keeps this field as the raw serialized
+// witness (a compact-size item count followed by the items), so an *empty*
+// stack is still one byte (0x00) and a plain len() > 0 check would call it
+// finalized. Bitcoin Core stores its final witness as a plain CScriptWitness
+// whose IsNull() is just stack.empty(), so it cannot distinguish an absent key
+// from one present with a zero-item stack; matching on item count keeps the
+// `fin` flag comparable across modules. An empty witness finalizes nothing.
+func finalWitnessHasItems(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	count, err := wire.ReadVarInt(bytes.NewReader(raw), 0)
+	if err != nil {
+		return false
+	}
+	return count > 0
+}
+
 //export BTCDParsePSBT
 func BTCDParsePSBT(data C.ByteArray) *C.char {
 	buffer := C.GoBytes(unsafe.Pointer(data.data), data.length)
@@ -299,6 +318,21 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 			// count partial sig
 			sigCount := len(packet.Inputs[i].PartialSigs)
 			result.WriteString(fmt.Sprintf("in%dsigs=%d;", i, sigCount))
+
+			// redeem/witness scripts as hex (empty if absent)
+			result.WriteString(fmt.Sprintf("in%drs=%x;", i, packet.Inputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("in%dws=%x;", i, packet.Inputs[i].WitnessScript))
+
+			// sighash type (0 if unset)
+			result.WriteString(fmt.Sprintf("in%dsh=%d;", i, uint32(packet.Inputs[i].SighashType)))
+
+			// BIP32 derivation count
+			result.WriteString(fmt.Sprintf("in%dbip32=%d;", i, len(packet.Inputs[i].Bip32Derivation)))
+
+			// finalized status
+			if len(packet.Inputs[i].FinalScriptSig) > 0 || finalWitnessHasItems(packet.Inputs[i].FinalScriptWitness) {
+				result.WriteString(fmt.Sprintf("in%dfin=1;", i))
+			}
 		}
 	}
 
@@ -308,6 +342,13 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 			result.WriteString(fmt.Sprintf("out%dval=%d;", i, txOut.Value))
 			scriptHex := fmt.Sprintf("%x", txOut.PkScript) // script pubkey as hex
 			result.WriteString(fmt.Sprintf("out%dscript=%s;", i, scriptHex))
+
+			// redeem/witness scripts as hex (empty if absent)
+			result.WriteString(fmt.Sprintf("out%drs=%x;", i, packet.Outputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("out%dws=%x;", i, packet.Outputs[i].WitnessScript))
+
+			// BIP32 derivation count
+			result.WriteString(fmt.Sprintf("out%dbip32=%d;", i, len(packet.Outputs[i].Bip32Derivation)))
 		}
 	}
 
