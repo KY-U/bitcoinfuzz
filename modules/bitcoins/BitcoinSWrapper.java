@@ -82,33 +82,37 @@ public class BitcoinSWrapper {
       Transaction tx = psbt.transaction();
 
       StringBuilder sb = new StringBuilder();
-      sb.append("lt=").append(tx.lockTime().toLong()).append(";");
-      sb.append("in=").append(tx.inputs().size()).append(";");
-      sb.append("out=").append(tx.outputs().size()).append(";");
+      sb.append("lock_time=").append(tx.lockTime().toLong()).append(";");
+      sb.append("inputs=").append(tx.inputs().size()).append(";");
+      sb.append("outputs=").append(tx.outputs().size()).append(";");
 
       scala.collection.immutable.Seq<?> inputs = tx.inputs();
       for (int i = 0; i < inputs.size(); i++) {
         TransactionInput txIn = (TransactionInput) inputs.apply(i);
         String prevHash = txIn.previousOutput().txIdBE().hex();
         long vout = txIn.previousOutput().vout().toLong();
-        sb.append("in")
+        sb.append("input")
             .append(i)
-            .append("prev=")
+            .append("previous_output=")
             .append(prevHash)
             .append(":")
             .append(vout)
             .append(";");
-        sb.append("in").append(i).append("seq=").append(txIn.sequence().toLong()).append(";");
+        sb.append("input")
+            .append(i)
+            .append("sequence=")
+            .append(txIn.sequence().toLong())
+            .append(";");
 
         InputPSBTMap inp = (InputPSBTMap) psbt.inputMaps().apply(i);
         boolean hasUtxo =
             inp.nonWitnessOrUnknownUTXOOpt().isDefined() || inp.witnessUTXOOpt().isDefined();
         if (hasUtxo) {
-          sb.append("in").append(i).append("utxo=1;");
+          sb.append("input").append(i).append("utxo=1;");
         }
-        sb.append("in")
+        sb.append("input")
             .append(i)
-            .append("sigs=")
+            .append("partial_signatures=")
             .append(inp.partialSignatures().size())
             .append(";");
 
@@ -119,7 +123,7 @@ public class BitcoinSWrapper {
             inp.redeemScriptOpt().isDefined()
                 ? inp.redeemScriptOpt().get().redeemScript().asmHex()
                 : "";
-        sb.append("in").append(i).append("rs=").append(redeemScriptHex).append(";");
+        sb.append("input").append(i).append("redeem_script=").append(redeemScriptHex).append(";");
 
         // witnessScript() is typed as RawScriptPubKey, an interface that
         // doesn't itself expose asmHex() to Java; cast to Script (every
@@ -128,22 +132,22 @@ public class BitcoinSWrapper {
             inp.witnessScriptOpt().isDefined()
                 ? ((Script) inp.witnessScriptOpt().get().witnessScript()).asmHex()
                 : "";
-        sb.append("in").append(i).append("ws=").append(witnessScriptHex).append(";");
+        sb.append("input").append(i).append("witness_script=").append(witnessScriptHex).append(";");
 
         // raw PSBT_IN_SIGHASH_TYPE value, or 0 if unset. HashType.num() is a
         // signed Java int holding the raw 4 bytes, so any value with the top
         // bit set (e.g. 0xfe8f263f) would render negative, while every other
         // module formats it unsigned (Bitcoin Core casts to uint32_t, btcd to
         // uint32, rust-psbt uses to_u32). Print it unsigned to match.
-        int sighash =
+        int sighashType =
             inp.sigHashTypeOpt().isDefined() ? inp.sigHashTypeOpt().get().hashType().num() : 0;
-        sb.append("in")
+        sb.append("input")
             .append(i)
-            .append("sh=")
-            .append(Integer.toUnsignedString(sighash))
+            .append("sighash_type=")
+            .append(Integer.toUnsignedString(sighashType))
             .append(";");
 
-        sb.append("in")
+        sb.append("input")
             .append(i)
             .append("bip32=")
             .append(inp.BIP32DerivationPaths().length())
@@ -164,19 +168,19 @@ public class BitcoinSWrapper {
             inp.finalizedScriptWitnessOpt().isDefined()
                 && !inp.finalizedScriptWitnessOpt().get().scriptWitness().stack().isEmpty();
         if (finalizedScriptSig || finalizedScriptWitness) {
-          sb.append("in").append(i).append("fin=1;");
+          sb.append("input").append(i).append("finalized=1;");
         }
       }
 
       scala.collection.immutable.Seq<?> outputs = tx.outputs();
       for (int i = 0; i < outputs.size(); i++) {
         TransactionOutput txOut = (TransactionOutput) outputs.apply(i);
-        sb.append("out")
+        sb.append("output")
             .append(i)
             .append("val=")
             .append(txOut.value().satoshis().toLong())
             .append(";");
-        sb.append("out")
+        sb.append("output")
             .append(i)
             .append("script=")
             .append(txOut.scriptPubKey().asmHex())
@@ -189,15 +193,23 @@ public class BitcoinSWrapper {
               out.redeemScriptOpt().isDefined()
                   ? out.redeemScriptOpt().get().redeemScript().asmHex()
                   : "";
-          sb.append("out").append(i).append("rs=").append(outRedeemScriptHex).append(";");
+          sb.append("output")
+              .append(i)
+              .append("redeem_script=")
+              .append(outRedeemScriptHex)
+              .append(";");
 
           String outWitnessScriptHex =
               out.witnessScriptOpt().isDefined()
                   ? out.witnessScriptOpt().get().witnessScript().asmHex()
                   : "";
-          sb.append("out").append(i).append("ws=").append(outWitnessScriptHex).append(";");
+          sb.append("output")
+              .append(i)
+              .append("witness_script=")
+              .append(outWitnessScriptHex)
+              .append(";");
 
-          sb.append("out")
+          sb.append("output")
               .append(i)
               .append("bip32=")
               .append(out.BIP32DerivationPaths().length())

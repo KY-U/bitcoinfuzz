@@ -260,7 +260,7 @@ func BTCDTransactionEval(data C.ByteArray) *C.char {
 // finalized. Bitcoin Core stores its final witness as a plain CScriptWitness
 // whose IsNull() is just stack.empty(), so it cannot distinguish an absent key
 // from one present with a zero-item stack; matching on item count keeps the
-// `fin` flag comparable across modules. An empty witness finalizes nothing.
+// `finalized` flag comparable across modules. An empty witness finalizes nothing.
 func finalWitnessHasItems(raw []byte) bool {
 	if len(raw) == 0 {
 		return false
@@ -295,43 +295,43 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 
 	var result strings.Builder // format psbt similar to rust_bitcoin
 
-	//result.WriteString(fmt.Sprintf("v=%d;", packet.UnsignedTx.Version))      // add Tx ver
-	result.WriteString(fmt.Sprintf("lt=%d;", packet.UnsignedTx.LockTime))    // add locktime
-	result.WriteString(fmt.Sprintf("in=%d;", len(packet.UnsignedTx.TxIn)))   // add ip count
-	result.WriteString(fmt.Sprintf("out=%d;", len(packet.UnsignedTx.TxOut))) // add op count
+	//result.WriteString(fmt.Sprintf("v=%d;", packet.UnsignedTx.Version))        // add Tx ver
+	result.WriteString(fmt.Sprintf("lock_time=%d;", packet.UnsignedTx.LockTime)) // add locktime
+	result.WriteString(fmt.Sprintf("inputs=%d;", len(packet.UnsignedTx.TxIn)))   // add ip count
+	result.WriteString(fmt.Sprintf("outputs=%d;", len(packet.UnsignedTx.TxOut))) // add op count
 
 	// processing ip
 	for i, txIn := range packet.UnsignedTx.TxIn {
 		if i < len(packet.Inputs) {
 			// prev op (txid:vout)
-			result.WriteString(fmt.Sprintf("in%dprev=%s:%d;",
+			result.WriteString(fmt.Sprintf("input%dprevious_output=%s:%d;",
 				i, txIn.PreviousOutPoint.Hash.String(), txIn.PreviousOutPoint.Index))
 
 			// seq number
-			result.WriteString(fmt.Sprintf("in%dseq=%d;", i, txIn.Sequence))
+			result.WriteString(fmt.Sprintf("input%dsequence=%d;", i, txIn.Sequence))
 
 			// check UTXO info
 			if packet.Inputs[i].WitnessUtxo != nil || packet.Inputs[i].NonWitnessUtxo != nil {
-				result.WriteString(fmt.Sprintf("in%dutxo=1;", i))
+				result.WriteString(fmt.Sprintf("input%dutxo=1;", i))
 			}
 
 			// count partial sig
-			sigCount := len(packet.Inputs[i].PartialSigs)
-			result.WriteString(fmt.Sprintf("in%dsigs=%d;", i, sigCount))
+			partialSignatureCount := len(packet.Inputs[i].PartialSigs)
+			result.WriteString(fmt.Sprintf("input%dpartial_signatures=%d;", i, partialSignatureCount))
 
 			// redeem/witness scripts as hex (empty if absent)
-			result.WriteString(fmt.Sprintf("in%drs=%x;", i, packet.Inputs[i].RedeemScript))
-			result.WriteString(fmt.Sprintf("in%dws=%x;", i, packet.Inputs[i].WitnessScript))
+			result.WriteString(fmt.Sprintf("input%dredeem_script=%x;", i, packet.Inputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("input%dwitness_script=%x;", i, packet.Inputs[i].WitnessScript))
 
 			// sighash type (0 if unset)
-			result.WriteString(fmt.Sprintf("in%dsh=%d;", i, uint32(packet.Inputs[i].SighashType)))
+			result.WriteString(fmt.Sprintf("input%dsighash_type=%d;", i, uint32(packet.Inputs[i].SighashType)))
 
 			// BIP32 derivation count
-			result.WriteString(fmt.Sprintf("in%dbip32=%d;", i, len(packet.Inputs[i].Bip32Derivation)))
+			result.WriteString(fmt.Sprintf("input%dbip32=%d;", i, len(packet.Inputs[i].Bip32Derivation)))
 
 			// finalized status
 			if len(packet.Inputs[i].FinalScriptSig) > 0 || finalWitnessHasItems(packet.Inputs[i].FinalScriptWitness) {
-				result.WriteString(fmt.Sprintf("in%dfin=1;", i))
+				result.WriteString(fmt.Sprintf("input%dfinalized=1;", i))
 			}
 		}
 	}
@@ -339,16 +339,16 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 	// processing op
 	for i, txOut := range packet.UnsignedTx.TxOut {
 		if i < len(packet.Outputs) {
-			result.WriteString(fmt.Sprintf("out%dval=%d;", i, txOut.Value))
+			result.WriteString(fmt.Sprintf("output%dval=%d;", i, txOut.Value))
 			scriptHex := fmt.Sprintf("%x", txOut.PkScript) // script pubkey as hex
-			result.WriteString(fmt.Sprintf("out%dscript=%s;", i, scriptHex))
+			result.WriteString(fmt.Sprintf("output%dscript=%s;", i, scriptHex))
 
 			// redeem/witness scripts as hex (empty if absent)
-			result.WriteString(fmt.Sprintf("out%drs=%x;", i, packet.Outputs[i].RedeemScript))
-			result.WriteString(fmt.Sprintf("out%dws=%x;", i, packet.Outputs[i].WitnessScript))
+			result.WriteString(fmt.Sprintf("output%dredeem_script=%x;", i, packet.Outputs[i].RedeemScript))
+			result.WriteString(fmt.Sprintf("output%dwitness_script=%x;", i, packet.Outputs[i].WitnessScript))
 
 			// BIP32 derivation count
-			result.WriteString(fmt.Sprintf("out%dbip32=%d;", i, len(packet.Outputs[i].Bip32Derivation)))
+			result.WriteString(fmt.Sprintf("output%dbip32=%d;", i, len(packet.Outputs[i].Bip32Derivation)))
 		}
 	}
 
