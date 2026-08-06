@@ -297,3 +297,6 @@ LOG_OUTPUTS=1 FUZZ=address_parse ./bitcoinfuzz crash-xxxx
 - embit: https://github.com/diybitcoinhardware/embit/issues/146
 - tmi2: https://github.com/theuni/tmi2/pull/4 (3 different bugs)
 - bolts: https://github.com/lightning/bolts/pull/1284
+- libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/5427420d7d34d6c5100921612f4afdece935fbee
+- libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/8f498571121f99aa777fed32c17cbf007a66dea4
+- libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/cfbfbb183693d9995737f146b86ebbe77d0214af
