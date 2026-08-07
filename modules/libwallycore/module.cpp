@@ -321,7 +321,7 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
   int res = wally_psbt_from_bytes(buffer.data(), buffer.size(),
                                   WALLY_PSBT_PARSE_FLAG_STRICT, &psbt);
   if (res != WALLY_OK) {
-    return std::nullopt;
+    return std::string{"INVALID"};
   }
 
   std::ostringstream result;

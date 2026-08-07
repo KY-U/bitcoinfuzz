@@ -339,6 +339,6 @@ pub unsafe extern "C" fn rust_psbt_psbt_parse(data: *const u8, len: usize) -> *m
         // entirely) rather than silently opted out, mirroring the other
         // PSBTv2-aware modules.
         Err(TryParseV2Error::ConflictingLockTime) => str_to_c_string("CONFLICTING_LOCKTIME"),
-        Err(TryParseV2Error::Invalid) => std::ptr::null_mut(),
+        Err(TryParseV2Error::Invalid) => str_to_c_string("INVALID"),
     }
 }

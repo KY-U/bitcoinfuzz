@@ -561,7 +561,7 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
   util::Result<PartiallySignedTransaction> psbt_result{
       DecodeRawPSBT(std::as_bytes(buffer))};
   if (!psbt_result) {
-    return std::string{};
+    return std::string{"INVALID"};
   }
   const PartiallySignedTransaction psbt{*psbt_result};
 
@@ -658,7 +658,7 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
     }
 
   } catch (const std::exception &e) {
-    return std::string{};
+    return std::string{"INVALID"};
   }
 
   return result;

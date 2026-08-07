@@ -322,7 +322,7 @@ public static class Bridge
         }
         catch
         {
-            return Marshal.StringToHGlobalAnsi("");
+            return Marshal.StringToHGlobalAnsi("INVALID");
         }
     }
 

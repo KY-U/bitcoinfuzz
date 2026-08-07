@@ -123,7 +123,7 @@ def psbt_parse(data):
 
         return ";".join(result) + ";"
     except Exception as _:
-        return None
+        return "INVALID"
 
 
 def bip32_master_keygen(data):

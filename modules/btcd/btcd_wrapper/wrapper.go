@@ -279,20 +279,27 @@ func BTCDParsePSBT(data C.ByteArray) *C.char {
 	var packet *psbt.Packet
 	var err error
 
-	packet, err = psbt.NewFromRawBytes(bytes.NewBuffer(buffer), false)
+	reader := bytes.NewReader(buffer)
+	packet, err = psbt.NewFromRawBytes(reader, false)
 
 	if err != nil { // base64 if binary fails
 		str := string(buffer)
 		decodedBytes, decodeErr := base64.StdEncoding.DecodeString(str)
 		if decodeErr != nil {
-			return nil
+			return C.CString("INVALID")
 		}
-		packet, err = psbt.NewFromRawBytes(bytes.NewBuffer(decodedBytes), false)
+		reader = bytes.NewReader(decodedBytes)
+		packet, err = psbt.NewFromRawBytes(reader, false)
 		if err != nil {
-			return nil
+			return C.CString("INVALID")
 		}
 	}
 
+	// Bitcoin Core rejects extra data after a complete PSBT, while btcd stops
+	// after reading the expected maps. Require the entire input to be consumed.
+	if reader.Len() != 0 {
+		return C.CString("INVALID")
+	}
 	var result strings.Builder // format psbt similar to rust_bitcoin
 
 	//result.WriteString(fmt.Sprintf("v=%d;", packet.UnsignedTx.Version))        // add Tx ver

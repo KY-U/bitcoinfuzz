@@ -220,7 +220,7 @@ public class BitcoinSWrapper {
       return sb.toString();
 
     } catch (Exception e) {
-      return "";
+      return "INVALID";
     }
   }
 }
