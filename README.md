@@ -300,3 +300,6 @@ LOG_OUTPUTS=1 FUZZ=address_parse ./bitcoinfuzz crash-xxxx
 - libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/5427420d7d34d6c5100921612f4afdece935fbee
 - libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/8f498571121f99aa777fed32c17cbf007a66dea4
 - libbitcoin-system: https://github.com/libbitcoin/libbitcoin-system/commit/cfbfbb183693d9995737f146b86ebbe77d0214af
+- embit: https://github.com/diybitcoinhardware/embit/pull/149
+- libwally-core: https://github.com/ElementsProject/libwally-core/pull/541
+- NBitcoin: https://github.com/MetacoSA/NBitcoin/pull/1327
