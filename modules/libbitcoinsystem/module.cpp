@@ -280,7 +280,7 @@ std::optional<std::string> LibbitcoinSystem::bip32_deserialize_extended_key(
         return "INVALID";
       }
       const auto &secret = priv.secret();
-      if (!verify(secret))
+      if (!verify_secret(secret))
         return "INVALID";
       data_chunk key_bytes(secret.begin(), secret.end());
       return format_key(lineage, priv.chain_code(), key_bytes);
@@ -297,7 +297,7 @@ std::optional<std::string> LibbitcoinSystem::bip32_deserialize_extended_key(
         return "INVALID";
       }
       const auto &point = pub.point();
-      if (!is_compressed_key(point) || !verify(data_slice(point)))
+      if (!is_compressed_key(point) || !verify_point(data_slice(point)))
         return "INVALID";
       data_chunk key_bytes(point.begin(), point.end());
       return format_key(lineage, pub.chain_code(), key_bytes);

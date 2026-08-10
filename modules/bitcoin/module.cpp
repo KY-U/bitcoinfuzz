@@ -771,8 +771,8 @@ Bitcoin::bip32_deserialize_extended_key(std::span<const uint8_t> buffer) const {
 
     std::string result = strprintf(
         "depth=%02x;fp=%02x%02x%02x%02x;child=%08x;chaincode=%s;key=%s",
-        ext_key.nDepth, ext_key.vchFingerprint[0], ext_key.vchFingerprint[1],
-        ext_key.vchFingerprint[2], ext_key.vchFingerprint[3], ext_key.nChild,
+        ext_key.nDepth, ext_key.fingerprint[0], ext_key.fingerprint[1],
+        ext_key.fingerprint[2], ext_key.fingerprint[3], ext_key.nChild,
         HexStr(ext_key.chaincode), HexStr(ext_key.key));
     return result;
   } catch (...) {
@@ -788,9 +788,8 @@ Bitcoin::bip32_deserialize_extended_key(std::span<const uint8_t> buffer) const {
 
     std::string result = strprintf(
         "depth=%02x;fp=%02x%02x%02x%02x;child=%08x;chaincode=%s;key=%s",
-        ext_pubkey.nDepth, ext_pubkey.vchFingerprint[0],
-        ext_pubkey.vchFingerprint[1], ext_pubkey.vchFingerprint[2],
-        ext_pubkey.vchFingerprint[3], ext_pubkey.nChild,
+        ext_pubkey.nDepth, ext_pubkey.fingerprint[0], ext_pubkey.fingerprint[1],
+        ext_pubkey.fingerprint[2], ext_pubkey.fingerprint[3], ext_pubkey.nChild,
         HexStr(ext_pubkey.chaincode), HexStr(ext_pubkey.pubkey));
     return result;
   } catch (...) {

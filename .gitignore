@@ -21,6 +21,7 @@ corpus/
 
 # Docker
 docker/
+docker-afl/
 *.log
 .env
 *.map
