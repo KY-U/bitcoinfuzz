@@ -452,6 +452,22 @@ services:
     volumes:
       - ./docker:/app/data
 
+  merkle_root_compute:
+    build:
+      context: .
+      tags:
+        - bitcoinfuzz:merkle_root_compute
+      args:
+        CXXFLAGS: "-DBITCOIN_CORE -DRUST_BITCOIN -DBTCD -DGOCOIN"
+        FUZZ: merkle_root_compute
+    environment:
+      MODULES: ${MODULES:-}
+      LIBFUZZ_DETECT_LEAKS: 0
+      ASAN_OPTIONS: detect_leaks=0
+    env_file: .env
+    volumes:
+      - ./docker:/app/data
+
   musig2_key_agg:
     build:
       context: .

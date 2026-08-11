@@ -141,6 +141,37 @@ func createDummyTransaction(pkScript []byte) *btc.Tx {
 	return tx
 }
 
+// GocoinMerkleRootCompute computes the merkle root over a list of raw 32-byte
+// hashes (internal byte order, concatenated) and reports whether a duplicated
+// subtree (CVE-2012-2459) was detected.
+//
+// Input: data is n*32 bytes (n >= 1; the driver never feeds empty lists).
+// Output: "<root_hex>;mutated=0|1" with the root in display byte order.
+//
+//export GocoinMerkleRootCompute
+func GocoinMerkleRootCompute(data C.ByteArray) *C.char {
+	input := C.GoBytes(unsafe.Pointer(data.data), C.int(data.length))
+	if len(input) == 0 || len(input)%32 != 0 {
+		return nil
+	}
+
+	// CalcMerkle appends to the slice while folding levels; hand it a copy
+	// with spare capacity so the caller's buffer is never written through.
+	count := len(input) / 32
+	mtr := make([][32]byte, count, 3*count)
+	for i := 0; i < count; i++ {
+		copy(mtr[i][:], input[i*32:(i+1)*32])
+	}
+
+	root, mutated := btc.CalcMerkle(mtr)
+
+	mutatedFlag := "0"
+	if mutated {
+		mutatedFlag = "1"
+	}
+	return C.CString(btc.NewUint256(root).String() + ";mutated=" + mutatedFlag)
+}
+
 // GocoinFreeString frees a C string that was allocated by Go.
 // Must be called to prevent memory leaks.
 //

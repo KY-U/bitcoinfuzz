@@ -136,5 +136,24 @@ Rustbitcoin::roundtrip_ellswift(std::span<const uint8_t> privkey) const {
   return result;
 }
 
+std::optional<std::string> Rustbitcoin::merkle_root_compute(
+    const std::vector<std::vector<uint8_t>> &hashes) const {
+  // Flatten the 32-byte hashes into a single buffer for the FFI call.
+  std::vector<uint8_t> flat;
+  flat.reserve(hashes.size() * 32);
+  for (const auto &hash : hashes) {
+    if (hash.size() != 32)
+      return std::nullopt;
+    flat.insert(flat.end(), hash.begin(), hash.end());
+  }
+
+  auto result_ptr = rust_bitcoin_merkle_root_compute(flat.data(), flat.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+  std::string result(result_ptr);
+  free_c_string(result_ptr);
+  return result;
+}
+
 } // namespace module
 } // namespace bitcoinfuzz

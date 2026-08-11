@@ -729,6 +729,66 @@ void Driver::StumpModifyAddTarget(std::span<const uint8_t> buffer) const {
   }
 }
 
+void Driver::MerkleRootComputeTarget(std::span<const uint8_t> buffer) const {
+  FuzzedDataProvider provider(buffer.data(), buffer.size());
+
+  std::vector<std::vector<uint8_t>> hashes;
+  while (true) {
+    auto hash = provider.ConsumeBytes<uint8_t>(32);
+    if (hash.size() < 32) {
+      break;
+    }
+    hashes.push_back(std::move(hash));
+  }
+
+  // Skip empty lists: the empty-tree result differs by design across
+  // implementations (Bitcoin Core returns the zero hash, rust-bitcoin
+  // returns None, gocoin's CalcMerkle would index out of range). An empty
+  // transaction list is consensus-invalid anyway, so there is no
+  // interesting differential to compare here.
+  if (hashes.empty())
+    return;
+
+  // Each module response is either the sentinel "REJECTED" (the library
+  // refuses to compute a root for this list, e.g. rust-bitcoin rejects
+  // CVE-2012-2459-mutated lists) or "<root_hex>;mutated=<0|1>". Roots are
+  // compared across all modules that produce one, while the mutation
+  // *detection* is compared across every responding module: a module that
+  // reports "mutated=1" and a module that answers "REJECTED" agree.
+  std::optional<std::string> last_root{std::nullopt};
+  std::string last_root_module;
+  std::optional<bool> last_detected{std::nullopt};
+  std::string last_detected_module;
+
+  for (auto &module : modules) {
+    std::optional<std::string> res{module.second->merkle_root_compute(hashes)};
+    if (!res.has_value())
+      continue;
+
+    std::optional<std::string> root{std::nullopt};
+    bool detected{false};
+    if (*res == "REJECTED") {
+      detected = true;
+    } else {
+      const auto sep{res->rfind(";mutated=")};
+      // A non-sentinel response must carry the mutation flag; anything else
+      // is a bug in the module wrapper itself.
+      assert(sep != std::string::npos);
+      const std::string flag{res->substr(sep + 9)};
+      assert(flag == "0" || flag == "1");
+      root = res->substr(0, sep);
+      detected = flag == "1";
+    }
+
+    if (root.has_value()) {
+      VerifyMatchingResponse(last_root, last_root_module, module.first, *root,
+                             "Merkle root computation failed");
+    }
+    VerifyMatchingResponse(last_detected, last_detected_module, module.first,
+                           detected, "Merkle mutation detection failed");
+  }
+}
+
 void Driver::Bip32DeriveFromPathTarget(std::span<const uint8_t> buffer) const {
   FuzzedDataProvider provider(buffer.data(), buffer.size());
   std::string path{provider.ConsumeRemainingBytesAsString()};
@@ -994,6 +1054,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->DecodeOnionTarget(buffer);
   } else if (target == "stump_modify_add") {
     this->StumpModifyAddTarget(buffer);
+  } else if (target == "merkle_root_compute") {
+    this->MerkleRootComputeTarget(buffer);
   } else if (target == "bip32_derive_from_path") {
     this->Bip32DeriveFromPathTarget(buffer);
   } else if (target == "musig2_key_agg") {
