@@ -153,6 +153,10 @@
 #include <modules/rustcryptoaes/module.h>
 #endif
 
+#ifdef BDK_SP
+#include <modules/bdksp/module.h>
+#endif
+
 #ifdef CUSTOM_MUTATOR_BOLT12_OFFER
 #include <custommutator/mutators/bolt12_offer.h>
 #endif
