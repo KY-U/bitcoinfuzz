@@ -742,6 +742,11 @@ Bitcoin::cmpctblocks_parse(std::span<const uint8_t> buffer) const {
 
 std::optional<std::string>
 Bitcoin::bip32_master_keygen(std::span<const uint8_t> seed) const {
+  if (seed.size() < 16 || seed.size() > 64) {
+    return std::nullopt; // CExtKey::SetSeed() asserts the BIP32 seed length,
+                         // see key.cpp in Bitcoin Core
+  }
+
   SelectParams(ChainType::MAIN);
   CExtKey master;
   master.SetSeed(
