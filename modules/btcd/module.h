@@ -45,6 +45,8 @@ public:
   bech32_segwit_roundtrip(const Bech32SegwitInput &input) const override;
   std::optional<std::string>
   bech32_convert_bits(const Bech32ConvertBitsInput &input) const override;
+  std::optional<std::string>
+  sighash_compute(const SighashComputeInput &input) const override;
   ~Btcd() noexcept override = default;
 };
 

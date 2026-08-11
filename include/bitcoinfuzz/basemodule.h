@@ -95,6 +95,33 @@ struct Bech32ConvertBitsInput {
   std::vector<uint8_t> data;
 };
 
+// Input for the sighash_compute target. Each module is expected to emulate
+// what its interpreter does for an OP_CHECKSIG execution: truncate the script
+// after the n-th executed OP_CODESEPARATOR (using its own script tokenizer),
+// and for legacy additionally remove the pushed signature blob (FindAndDelete)
+// before computing the digest.
+struct SighashComputeInput {
+  // Serialized transaction (witness data tolerated; it never enters the
+  // sighash preimage).
+  std::vector<uint8_t> tx_bytes;
+  // Index of the input being signed; modules clamp with idx % vin.size().
+  uint32_t input_index;
+  // The script being executed (scriptCode), with OP_CODESEPARATORs intact.
+  std::vector<uint8_t> script;
+  // Truncate the script right after the n-th executed OP_CODESEPARATOR
+  // (0 = no truncation; if the script contains fewer, clamp to the last one).
+  uint32_t n_codesep;
+  // Legacy only: remove canonical pushes of this signature blob from the
+  // (truncated) script before hashing. Empty = no deletion.
+  std::vector<uint8_t> sig_to_delete;
+  // Spend output amount in satoshis (segwit v0 only; ignored by legacy).
+  uint64_t amount;
+  // Raw sighash type, deliberately NOT restricted to standard values.
+  uint32_t sighash_type;
+  // false = legacy (SigVersion::BASE), true = segwit v0 (BIP143).
+  bool is_segwit_v0;
+};
+
 class BaseModule {
 public:
   const std::string name;
@@ -201,6 +228,8 @@ public:
   //                  leaf indices, in traversal order (display byte order)
   virtual std::optional<std::string>
   partial_merkle_tree(std::span<const uint8_t> buffer) const;
+  virtual std::optional<std::string>
+  sighash_compute(const SighashComputeInput &input) const;
 
   virtual std::optional<std::string>
   bip32_derive_from_path(std::span<const uint8_t> buffer) const;
