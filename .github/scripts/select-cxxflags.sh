@@ -37,6 +37,7 @@ declare -A MODULE_FLAGS=(
   [libwallycore]="-DLIBWALLY_CORE"
   [rustmusig2]="-DRUST_MUSIG2"
   [rustcryptoaes]="-DRUSTCRYPTO_AES"
+  [bdksp]="-DBDK_SP"
   [rustreexo]="-DRUSTREEXO"
   [utreexo]="-DUTREEXO"
   [pycoin]="-DPYCOIN"
