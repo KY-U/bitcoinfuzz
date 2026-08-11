@@ -26,6 +26,31 @@ struct Musig2SignSessionInput {
   std::vector<Musig2Tweak> tweaks;
 };
 
+// Sender-side input for BIP-352 Silent Payments output creation.
+//
+// Both the inputs being spent and the recipient addresses are described by
+// secret keys rather than serialized public keys: every module derives the
+// public keys itself, which keeps ~100% of fuzzer inputs valid so the budget
+// is spent inside the protocol logic instead of on pubkey parsing.
+struct SilentPaymentsCreateOutputsInput {
+  // Serialized smallest outpoint (lexicographically) of the transaction
+  // inputs, as required by BIP-352.
+  std::array<uint8_t, 36> outpoint_smallest{};
+  // Concatenated 32-byte secret keys of the Silent Payments eligible inputs.
+  std::vector<uint8_t> input_seckeys;
+  // One flag per input key. Taproot keys are negated to their even-Y form
+  // before being summed; non-taproot keys are summed as-is. Not
+  // std::vector<bool>: the bytes are handed to a C FFI, so they must be
+  // contiguous and addressable.
+  std::vector<uint8_t> input_is_taproot;
+  // Concatenated 32-byte scan and spend secret keys, one pair per recipient.
+  // Recipient i is (scan_seckeys[i*32..], spend_seckeys[i*32..]). Scan keys
+  // repeat across recipients so the BIP-352 grouping and k-increment logic is
+  // reachable.
+  std::vector<uint8_t> scan_seckeys;
+  std::vector<uint8_t> spend_seckeys;
+};
+
 class BaseModule {
 public:
   const std::string name;
@@ -112,6 +137,8 @@ public:
              bool pad, std::span<const uint8_t> data) const;
   virtual std::optional<std::string>
   musig2_sign_session(const Musig2SignSessionInput &input) const;
+  virtual std::optional<std::string> silentpayments_create_outputs(
+      const SilentPaymentsCreateOutputsInput &input) const;
 
   virtual ~BaseModule() noexcept;
 };

@@ -7,6 +7,7 @@ extern "C" {
 #include <secp256k1_extrakeys.h>
 #include <secp256k1_musig.h>
 #include <secp256k1_schnorrsig.h>
+#include <secp256k1_silentpayments.h>
 }
 
 #undef template
@@ -466,6 +467,105 @@ std::optional<std::string> secp256k1_musig2_sign_session(
          hex_encode(final_sig.data(), final_sig.size());
 }
 
+// Returned when a secret key is out of range. It is a response like any other,
+// not a skip: both libraries see the same bytes, so both must reject them.
+constexpr const char *SILENTPAYMENTS_INVALID_SECKEY = "INVALID_SECKEY";
+
+std::optional<std::string> secp256k1_silentpayments_create_outputs(
+    const bitcoinfuzz::SilentPaymentsCreateOutputsInput &input) {
+  const size_t num_inputs = input.input_seckeys.size() / 32;
+  const size_t num_recipients = input.scan_seckeys.size() / 32;
+  if (num_inputs == 0 || num_recipients == 0 ||
+      input.input_seckeys.size() != num_inputs * 32 ||
+      input.input_is_taproot.size() != num_inputs ||
+      input.scan_seckeys.size() != num_recipients * 32 ||
+      input.spend_seckeys.size() != num_recipients * 32) {
+    return std::nullopt;
+  }
+
+  // The API takes taproot inputs as keypairs (their secret keys are negated to
+  // the even-Y form before summing) and non-taproot inputs as raw secret keys.
+  // Size the keypair storage up front: pointers into it are handed to the API
+  // and must stay valid.
+  const size_t num_keypairs =
+      std::count(input.input_is_taproot.begin(), input.input_is_taproot.end(),
+                 static_cast<uint8_t>(1));
+  std::vector<secp256k1_keypair> keypairs(num_keypairs);
+  std::vector<const secp256k1_keypair *> keypair_ptrs;
+  std::vector<const unsigned char *> seckey_ptrs;
+  keypair_ptrs.reserve(num_keypairs);
+  seckey_ptrs.reserve(num_inputs - num_keypairs);
+
+  for (size_t i = 0; i < num_inputs; ++i) {
+    const unsigned char *seckey = input.input_seckeys.data() + (i * 32);
+    if (!secp256k1_ec_seckey_verify(secp256k1_ctx, seckey)) {
+      return SILENTPAYMENTS_INVALID_SECKEY;
+    }
+    if (input.input_is_taproot[i]) {
+      secp256k1_keypair *keypair = &keypairs[keypair_ptrs.size()];
+      if (!secp256k1_keypair_create(secp256k1_ctx, keypair, seckey)) {
+        return SILENTPAYMENTS_INVALID_SECKEY;
+      }
+      keypair_ptrs.push_back(keypair);
+    } else {
+      seckey_ptrs.push_back(seckey);
+    }
+  }
+
+  // Recipient addresses are derived from secret keys rather than parsed, so
+  // once the keys are in range the scan and spend public keys are valid curve
+  // points and the fuzzer budget goes into the protocol logic.
+  std::vector<secp256k1_silentpayments_recipient> recipients(num_recipients);
+  std::vector<const secp256k1_silentpayments_recipient *> recipient_ptrs(
+      num_recipients);
+  for (size_t i = 0; i < num_recipients; ++i) {
+    const unsigned char *scan_seckey = input.scan_seckeys.data() + (i * 32);
+    const unsigned char *spend_seckey = input.spend_seckeys.data() + (i * 32);
+    if (!secp256k1_ec_seckey_verify(secp256k1_ctx, scan_seckey) ||
+        !secp256k1_ec_seckey_verify(secp256k1_ctx, spend_seckey)) {
+      return SILENTPAYMENTS_INVALID_SECKEY;
+    }
+    if (!secp256k1_ec_pubkey_create(secp256k1_ctx, &recipients[i].scan_pubkey,
+                                    scan_seckey) ||
+        !secp256k1_ec_pubkey_create(secp256k1_ctx, &recipients[i].spend_pubkey,
+                                    spend_seckey)) {
+      return SILENTPAYMENTS_INVALID_SECKEY;
+    }
+    recipients[i].index = i;
+    recipient_ptrs[i] = &recipients[i];
+  }
+
+  std::vector<secp256k1_xonly_pubkey> outputs(num_recipients);
+  std::vector<secp256k1_xonly_pubkey *> output_ptrs(num_recipients);
+  for (size_t i = 0; i < num_recipients; ++i) {
+    output_ptrs[i] = &outputs[i];
+  }
+
+  // The call may reorder recipient_ptrs in place (it groups them by scan
+  // pubkey), but generated_outputs stays in the original recipient order.
+  if (!secp256k1_silentpayments_sender_create_outputs(
+          secp256k1_ctx, output_ptrs.data(), recipient_ptrs.data(),
+          num_recipients, input.outpoint_smallest.data(),
+          keypair_ptrs.empty() ? nullptr : keypair_ptrs.data(),
+          keypair_ptrs.size(),
+          seckey_ptrs.empty() ? nullptr : seckey_ptrs.data(),
+          seckey_ptrs.size())) {
+    return "CREATE_FAIL";
+  }
+
+  std::string result;
+  for (size_t i = 0; i < num_recipients; ++i) {
+    std::array<unsigned char, 32> output_ser{};
+    if (!secp256k1_xonly_pubkey_serialize(secp256k1_ctx, output_ser.data(),
+                                          &outputs[i])) {
+      return "SERIALIZE_FAIL";
+    }
+    result += hex_encode(output_ser.data(), output_ser.size());
+  }
+
+  return result;
+}
+
 } // namespace
 
 namespace bitcoinfuzz {
@@ -532,6 +632,11 @@ Secp256k1::musig2_key_agg(std::span<const uint8_t> seckeys) const {
 std::optional<std::string>
 Secp256k1::musig2_sign_session(const Musig2SignSessionInput &input) const {
   return secp256k1_musig2_sign_session(input);
+}
+
+std::optional<std::string> Secp256k1::silentpayments_create_outputs(
+    const SilentPaymentsCreateOutputsInput &input) const {
+  return secp256k1_silentpayments_create_outputs(input);
 }
 
 } // namespace module

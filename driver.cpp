@@ -847,6 +847,68 @@ void Driver::Aes256CbcTarget(std::span<const uint8_t> buffer) const {
   }
 }
 
+void Driver::SilentPaymentsCreateOutputsTarget(
+    std::span<const uint8_t> buffer) const {
+  FuzzedDataProvider provider(buffer.data(), buffer.size());
+
+  // BIP-352 requires at least one eligible input and one recipient. The upper
+  // bounds keep a single execution cheap; the recipient group limit (2323) is
+  // far out of reach for a fuzzer anyway.
+  const size_t num_inputs = provider.ConsumeIntegralInRange<size_t>(1, 8);
+  const size_t num_recipients = provider.ConsumeIntegralInRange<size_t>(1, 8);
+  // Recipients draw their scan key from a smaller pool so that several of them
+  // share one scan key. Sharing is what makes a recipient "group" in BIP-352,
+  // and groups are where the k counter is incremented per output.
+  const size_t num_scan_keys =
+      provider.ConsumeIntegralInRange<size_t>(1, num_recipients);
+
+  SilentPaymentsCreateOutputsInput input;
+
+  const std::vector<uint8_t> outpoint = provider.ConsumeBytes<uint8_t>(36);
+  if (outpoint.size() != 36)
+    return;
+  std::copy(outpoint.begin(), outpoint.end(), input.outpoint_smallest.begin());
+
+  input.input_seckeys = provider.ConsumeBytes<uint8_t>(num_inputs * 32);
+  if (input.input_seckeys.size() != num_inputs * 32)
+    return;
+  for (size_t i = 0; i < num_inputs; ++i) {
+    input.input_is_taproot.push_back(provider.ConsumeBool() ? 1 : 0);
+  }
+
+  const std::vector<uint8_t> scan_key_pool =
+      provider.ConsumeBytes<uint8_t>(num_scan_keys * 32);
+  if (scan_key_pool.size() != num_scan_keys * 32)
+    return;
+
+  input.scan_seckeys.reserve(num_recipients * 32);
+  input.spend_seckeys = provider.ConsumeBytes<uint8_t>(num_recipients * 32);
+  if (input.spend_seckeys.size() != num_recipients * 32)
+    return;
+  for (size_t i = 0; i < num_recipients; ++i) {
+    const size_t scan_key_index =
+        provider.ConsumeIntegralInRange<size_t>(0, num_scan_keys - 1);
+    const auto begin = scan_key_pool.begin() + (scan_key_index * 32);
+    input.scan_seckeys.insert(input.scan_seckeys.end(), begin, begin + 32);
+  }
+
+  std::optional<std::string> last_response{std::nullopt};
+  std::string last_module_name;
+
+  for (auto &module : modules) {
+    // Rejections are reported as sentinels ("INVALID_SECKEY", "CREATE_FAIL")
+    // rather than as nullopt, so they are compared like any other response and
+    // an accept-vs-reject disagreement between modules trips the assert.
+    // nullopt is left for modules that do not implement the target at all.
+    std::optional<std::string> res{
+        module.second->silentpayments_create_outputs(input)};
+    if (!res.has_value())
+      continue;
+    VerifyMatchingResponse(last_response, last_module_name, module.first, *res,
+                           "Silent Payments output creation failed");
+  }
+}
+
 void Driver::Run(const uint8_t *data, const size_t size,
                  const std::string &target) const {
   std::span<const uint8_t> buffer{data, size};
@@ -920,6 +982,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->Aes256CbcTarget(buffer);
   } else if (target == "musig2_sign_session") {
     this->Musig2SignSessionTarget(buffer);
+  } else if (target == "silentpayments_create_outputs") {
+    this->SilentPaymentsCreateOutputsTarget(buffer);
   } else {
     std::cout << "Unknown target: " << target << std::endl;
     assert(false);
