@@ -99,6 +99,11 @@ extern char* DecredSignDER(ByteArray privKeyData, ByteArray hashData);
 extern int DecredSignVerify(ByteArray privKeyData, ByteArray hashData, ByteArray signData);
 extern char* DecredECDH(ByteArray privKeyData, ByteArray pubKeyData);
 
+// DecredPubkeyParse parses a SEC1-encoded public key and returns the
+// canonical compressed encoding ("OK:<hex>"), or "ERR" on rejection.
+//
+extern char* DecredPubkeyParse(ByteArray data);
+
 #ifdef __cplusplus
 }
 #endif

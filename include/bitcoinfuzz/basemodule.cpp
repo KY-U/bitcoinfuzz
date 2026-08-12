@@ -109,6 +109,11 @@ BaseModule::private_to_public_key(std::span<const uint8_t> /*buffer*/) const {
 }
 
 std::optional<std::string>
+BaseModule::pubkey_parse(std::span<const uint8_t> /*buffer*/) const {
+  return std::nullopt;
+}
+
+std::optional<std::string>
 BaseModule::sign_compact(std::span<const uint8_t> /*buffer*/,
                          std::span<const uint8_t> /*hash*/) const {
   return std::nullopt;

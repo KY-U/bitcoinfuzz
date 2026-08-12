@@ -24,6 +24,26 @@ pub unsafe extern "C" fn k256_private_to_public_key(buffer: *const u8) -> *mut c
     return str_to_c_string(&hex::encode(pub_key));
 }
 
+/// Parses a SEC1-encoded public key and returns the canonical compressed
+/// encoding, so the driver compares both acceptance and the accepted point.
+/// Note k256's sec1 layer has no hybrid (0x06/0x07) tag and accepts the
+/// compact (0x05) encoding; the driver skips those input classes for this
+/// module.
+#[no_mangle]
+pub unsafe extern "C" fn k256_pubkey_parse(data: *const u8, len: usize) -> *mut c_char {
+    let bytes = slice::from_raw_parts(data, len);
+
+    let pub_key = match k256::PublicKey::from_sec1_bytes(bytes) {
+        Ok(k) => k,
+        Err(_) => {
+            return str_to_c_string("ERR");
+        }
+    };
+
+    let compressed = VerifyingKey::from(pub_key).to_encoded_point(true);
+    return str_to_c_string(&format!("OK:{}", hex::encode(compressed.as_bytes())));
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn k256_sign_compact(buffer: *const u8, hash: *const u8) -> *mut c_char {
     let privkey_slice = slice::from_raw_parts(buffer, 32);

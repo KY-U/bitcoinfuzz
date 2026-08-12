@@ -103,6 +103,12 @@ public:
   kernel_block_check(std::span<const uint8_t> buffer) const;
   virtual std::optional<std::string>
   private_to_public_key(std::span<const uint8_t> buffer) const;
+  // Parses a serialized secp256k1 public key (SEC1: 33-byte compressed
+  // 0x02/0x03, 65-byte uncompressed 0x04, ...). Returns "ERR" on rejection,
+  // or "OK:<33-byte canonical compressed encoding, hex>" on acceptance, so
+  // that accept-vs-reject and accepted-point divergences both surface.
+  virtual std::optional<std::string>
+  pubkey_parse(std::span<const uint8_t> buffer) const;
   virtual std::optional<std::string>
   sign_compact(std::span<const uint8_t> buffer,
                std::span<const uint8_t> hash) const;

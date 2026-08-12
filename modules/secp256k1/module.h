@@ -11,6 +11,8 @@ public:
   std::optional<std::string>
   private_to_public_key(std::span<const uint8_t> buffer) const override;
   std::optional<std::string>
+  pubkey_parse(std::span<const uint8_t> buffer) const override;
+  std::optional<std::string>
   sign_compact(std::span<const uint8_t> buffer,
                std::span<const uint8_t> hash) const override;
   std::optional<std::string>
