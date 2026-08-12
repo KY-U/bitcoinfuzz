@@ -161,6 +161,10 @@
 #include <modules/bluewalletsp/module.h>
 #endif
 
+#ifdef SPDK
+#include <modules/spdk/module.h>
+#endif
+
 #ifdef CUSTOM_MUTATOR_BOLT12_OFFER
 #include <custommutator/mutators/bolt12_offer.h>
 #endif

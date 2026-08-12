@@ -495,7 +495,7 @@ services:
       tags:
         - bitcoinfuzz:silentpayments_create_outputs
       args:
-        CXXFLAGS: "-DBDK_SP -DBLUEWALLET_SP -DSECP256K1"
+        CXXFLAGS: "-DBDK_SP -DBLUEWALLET_SP -DSPDK -DSECP256K1"
         FUZZ: silentpayments_create_outputs
     env_file: .env
     environment:
