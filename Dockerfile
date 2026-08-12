@@ -72,8 +72,13 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=fuzz-pip \
 
 # libbitcoin-system requires Boost >= 1.86; Ubuntu 24.04 ships 1.83.
 # Build the required Boost components from source and install to /opt/boost-1.86.
-RUN curl -sSL -o /tmp/boost.tar.gz \
+RUN curl --fail --show-error --location \
+        --retry 5 \
+        --retry-all-errors \
+        --retry-delay 2 \
+        -o /tmp/boost.tar.gz \
         https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-cmake.tar.gz && \
+    tar -tzf /tmp/boost.tar.gz >/dev/null && \
     tar -xzf /tmp/boost.tar.gz -C /tmp && \
     cd /tmp/boost-1.86.0 && \
     cmake -B build \

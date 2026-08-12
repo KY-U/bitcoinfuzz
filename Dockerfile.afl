@@ -68,8 +68,13 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=fuzz-afl-pip \
     python3 -m pip install mako setuptools 'cmake>=3.30' && \
     python3 -m pip install -r /tmp/requirements.txt
 
-RUN curl -sSL -o /tmp/boost.tar.gz \
+RUN curl --fail --show-error --location \
+        --retry 5 \
+        --retry-all-errors \
+        --retry-delay 2 \
+        -o /tmp/boost.tar.gz \
         https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-cmake.tar.gz && \
+    tar -tzf /tmp/boost.tar.gz >/dev/null && \
     tar -xzf /tmp/boost.tar.gz -C /tmp && \
     cd /tmp/boost-1.86.0 && \
     cmake -B build \
