@@ -1,8 +1,9 @@
 use silentpayments::{
+    receiving::{Label, Receiver},
     secp256k1::{All, Parity, PublicKey, Scalar, Secp256k1, SecretKey},
     sending::generate_recipient_pubkeys,
     utils::{sending::calculate_partial_secret, OutPoint},
-    SilentPaymentAddress,
+    Network, SilentPaymentAddress, SpVersion,
 };
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -14,6 +15,11 @@ use std::{ptr, slice};
 /// mismatch instead of as agreement on rejecting the input.
 const INVALID_SECKEY: &str = "INVALID_SECKEY";
 const CREATE_FAIL: &str = "CREATE_FAIL";
+
+/// Returned when tweaking a spend key with its label is rejected, which needs a
+/// label hash outside the curve order or a label that negates the spend key.
+/// Kept distinct from CREATE_FAIL so a disagreement points at the step.
+const LABEL_FAIL: &str = "LABEL_FAIL";
 
 /// Tells the C++ wrapper to drop the response instead of comparing it. See
 /// [`diverges_on_intermediate_zero_sum`] for the single case that uses it.
@@ -39,12 +45,15 @@ const OUTPOINT_LEN: usize = 36;
 /// * `n_inputs` - number of inputs being spent
 /// * `scan_seckeys` - `n_recipients` concatenated 32-byte scan secret keys
 /// * `spend_seckeys` - `n_recipients` concatenated 32-byte spend secret keys
+/// * `recipient_is_labeled` - `n_recipients` flags, non-zero for a labeled address
+/// * `recipient_labels` - `n_recipients` label integers, read where the flag is set
 /// * `n_recipients` - number of recipients
 ///
 /// # Returns
 /// * the concatenated 32-byte x-only outputs in recipient order, hex-encoded;
 /// * the "CREATE_FAIL" sentinel when output creation is rejected;
 /// * the "INVALID_SECKEY" sentinel when a secret key is out of range;
+/// * the "LABEL_FAIL" sentinel when tweaking a spend key with its label fails;
 /// * the "SKIP_INTERMEDIATE_ZERO_SUM" sentinel for the known upstream
 ///   divergence described on [`diverges_on_intermediate_zero_sum`];
 /// * null only when the arguments themselves are malformed.
@@ -55,8 +64,9 @@ const OUTPOINT_LEN: usize = 36;
 ///
 /// # Safety
 /// `outpoint36` must point to 36 valid bytes, `input_seckeys` to `n_inputs * 32`,
-/// `input_is_taproot` to `n_inputs`, and `scan_seckeys` and `spend_seckeys` to
-/// `n_recipients * 32` each.
+/// `input_is_taproot` to `n_inputs`, `scan_seckeys` and `spend_seckeys` to
+/// `n_recipients * 32` each, and `recipient_is_labeled` and `recipient_labels`
+/// to `n_recipients` elements each.
 #[no_mangle]
 pub unsafe extern "C" fn spdk_create_outputs(
     outpoint36: *const u8,
@@ -65,6 +75,8 @@ pub unsafe extern "C" fn spdk_create_outputs(
     n_inputs: usize,
     scan_seckeys: *const u8,
     spend_seckeys: *const u8,
+    recipient_is_labeled: *const u8,
+    recipient_labels: *const u32,
     n_recipients: usize,
 ) -> *mut c_char {
     if outpoint36.is_null()
@@ -72,6 +84,8 @@ pub unsafe extern "C" fn spdk_create_outputs(
         || input_is_taproot.is_null()
         || scan_seckeys.is_null()
         || spend_seckeys.is_null()
+        || recipient_is_labeled.is_null()
+        || recipient_labels.is_null()
         || n_inputs == 0
         || n_recipients == 0
     {
@@ -87,6 +101,8 @@ pub unsafe extern "C" fn spdk_create_outputs(
     let is_taproot = slice::from_raw_parts(input_is_taproot, n_inputs);
     let scan_seckeys = slice::from_raw_parts(scan_seckeys, n_recipients * SECKEY_LEN);
     let spend_seckeys = slice::from_raw_parts(spend_seckeys, n_recipients * SECKEY_LEN);
+    let is_labeled = slice::from_raw_parts(recipient_is_labeled, n_recipients);
+    let labels = slice::from_raw_parts(recipient_labels, n_recipients);
 
     let secp = Secp256k1::new();
 
@@ -114,10 +130,19 @@ pub unsafe extern "C" fn spdk_create_outputs(
             Some(sk) => sk,
             None => return str_to_c_string(INVALID_SECKEY),
         };
-        addresses.push(SilentPaymentAddress::new_v0(
-            PublicKey::from_secret_key(&secp, &scan_seckey),
-            PublicKey::from_secret_key(&secp, &spend_seckey),
-        ));
+        let scan_pubkey = PublicKey::from_secret_key(&secp, &scan_seckey);
+        let spend_pubkey = PublicKey::from_secret_key(&secp, &spend_seckey);
+        // A labeled address carries B_spend + m*G in place of the spend key.
+        // The sender cannot tell the difference, so all this compares is that
+        // every module derives the same label tweak.
+        addresses.push(if is_labeled[i] != 0 {
+            match labeled_address(scan_seckey, scan_pubkey, spend_pubkey, labels[i]) {
+                Some(address) => address,
+                None => return str_to_c_string(LABEL_FAIL),
+            }
+        } else {
+            SilentPaymentAddress::new_v0(scan_pubkey, spend_pubkey)
+        });
     }
 
     if diverges_on_intermediate_zero_sum(&secp, &input_keys) {
@@ -158,6 +183,33 @@ pub unsafe extern "C" fn spdk_create_outputs(
 
 fn parse_seckey(bytes: &[u8]) -> Option<SecretKey> {
     SecretKey::from_slice(bytes).ok()
+}
+
+/// Derives the address a recipient hands out for label `m`.
+///
+/// The crate keeps labels on the receiving side, behind a `Receiver` that owns
+/// its label set, so the address has to be taken through that type rather than
+/// built from the tweak directly. `Receiver::new` insists on a change label, so
+/// m = 0 is registered first even when the wanted label is another one; both
+/// steps only fail on a label hash outside the curve order or one that negates
+/// the spend key.
+fn labeled_address(
+    scan_seckey: SecretKey,
+    scan_pubkey: PublicKey,
+    spend_pubkey: PublicKey,
+    m: u32,
+) -> Option<SilentPaymentAddress> {
+    let mut receiver = Receiver::new(
+        SpVersion::ZERO,
+        scan_pubkey,
+        spend_pubkey,
+        Label::new(scan_seckey, 0),
+        Network::Mainnet,
+    )
+    .ok()?;
+    let label = Label::new(scan_seckey, m);
+    receiver.add_label(label.clone()).ok()?;
+    receiver.get_receiving_address_for_label(&label).ok()
 }
 
 /// Reports the one input shape where `silentpayments` disagrees with BIP-352, so

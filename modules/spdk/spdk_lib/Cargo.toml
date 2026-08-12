@@ -9,8 +9,10 @@ edition = "2021"
 
 [dependencies]
 hex = "0.4.3"
-# Only the sending half of the crate is exercised by this target, and dropping
-# the default features also drops serde and the receiving code from the build.
+# "sending" covers the target itself. "receiving" comes along only for Label and
+# Receiver: the crate keeps label derivation on the recipient side, and the
+# target needs a labeled address to hand to the sender.
 silentpayments = { git = "https://github.com/cygnet3/spdk", rev = "eb82e8f99f3838d882de960ff26974d04463abbb", default-features = false, features = [
     "sending",
+    "receiving",
 ] }

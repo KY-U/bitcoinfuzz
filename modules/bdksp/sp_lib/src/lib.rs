@@ -22,6 +22,11 @@ const INVALID_SECKEY: &str = "INVALID_SECKEY";
 /// [`diverges_on_intermediate_zero_sum`] for the single case that uses it.
 const SKIP: &str = "SKIP_INTERMEDIATE_ZERO_SUM";
 
+/// Returned when tweaking a spend key with its label is rejected, which needs a
+/// label hash outside the curve order or a label that negates the spend key.
+/// Kept distinct from CREATE_FAIL so a disagreement points at the step.
+const LABEL_FAIL: &str = "LABEL_FAIL";
+
 /// Creates the BIP-352 Silent Payments outputs for a set of recipients, mirroring
 /// the `secp256k1` module's `secp256k1_silentpayments_create_outputs` so the C++
 /// driver can compare the two byte-for-byte.
@@ -39,12 +44,15 @@ const SKIP: &str = "SKIP_INTERMEDIATE_ZERO_SUM";
 /// * `n_inputs` - number of inputs being spent
 /// * `scan_seckeys` - `n_recipients` concatenated 32-byte scan secret keys
 /// * `spend_seckeys` - `n_recipients` concatenated 32-byte spend secret keys
+/// * `recipient_is_labeled` - `n_recipients` flags, non-zero for a labeled address
+/// * `recipient_labels` - `n_recipients` label integers, read where the flag is set
 /// * `n_recipients` - number of recipients
 ///
 /// # Returns
 /// * the concatenated 32-byte x-only outputs in recipient order, hex-encoded;
 /// * the "CREATE_FAIL" sentinel when output creation is rejected;
 /// * the "INVALID_SECKEY" sentinel when a secret key is out of range;
+/// * the "LABEL_FAIL" sentinel when tweaking a spend key with its label fails;
 /// * the "SKIP_INTERMEDIATE_ZERO_SUM" sentinel for the known upstream
 ///   divergence described on [`diverges_on_intermediate_zero_sum`];
 /// * null only when the arguments themselves are malformed.
@@ -55,8 +63,9 @@ const SKIP: &str = "SKIP_INTERMEDIATE_ZERO_SUM";
 ///
 /// # Safety
 /// `outpoint36` must point to 36 valid bytes, `input_seckeys` to `n_inputs * 32`,
-/// `input_is_taproot` to `n_inputs`, and `scan_seckeys` and `spend_seckeys` to
-/// `n_recipients * 32` each.
+/// `input_is_taproot` to `n_inputs`, `scan_seckeys` and `spend_seckeys` to
+/// `n_recipients * 32` each, and `recipient_is_labeled` and `recipient_labels`
+/// to `n_recipients` elements each.
 #[no_mangle]
 pub unsafe extern "C" fn bdk_sp_create_outputs(
     outpoint36: *const u8,
@@ -65,6 +74,8 @@ pub unsafe extern "C" fn bdk_sp_create_outputs(
     n_inputs: usize,
     scan_seckeys: *const u8,
     spend_seckeys: *const u8,
+    recipient_is_labeled: *const u8,
+    recipient_labels: *const u32,
     n_recipients: usize,
 ) -> *mut c_char {
     if outpoint36.is_null()
@@ -72,6 +83,8 @@ pub unsafe extern "C" fn bdk_sp_create_outputs(
         || input_is_taproot.is_null()
         || scan_seckeys.is_null()
         || spend_seckeys.is_null()
+        || recipient_is_labeled.is_null()
+        || recipient_labels.is_null()
         || n_inputs == 0
         || n_recipients == 0
     {
@@ -86,6 +99,8 @@ pub unsafe extern "C" fn bdk_sp_create_outputs(
     let is_taproot = slice::from_raw_parts(input_is_taproot, n_inputs);
     let scan_seckeys = slice::from_raw_parts(scan_seckeys, n_recipients * 32);
     let spend_seckeys = slice::from_raw_parts(spend_seckeys, n_recipients * 32);
+    let is_labeled = slice::from_raw_parts(recipient_is_labeled, n_recipients);
+    let labels = slice::from_raw_parts(recipient_labels, n_recipients);
 
     let secp = Secp256k1::new();
 
@@ -121,11 +136,23 @@ pub unsafe extern "C" fn bdk_sp_create_outputs(
             Some(sk) => sk,
             None => return str_to_c_string(INVALID_SECKEY),
         };
-        sp_codes.push(SilentPaymentCode::new_v0(
+        let sp_code = SilentPaymentCode::new_v0(
             PublicKey::from_secret_key(&secp, &scan_seckey),
             PublicKey::from_secret_key(&secp, &spend_seckey),
             Network::Bitcoin,
-        ));
+        );
+        // A labeled address carries B_spend + m*G in place of the spend key.
+        // The sender cannot tell the difference, so all this compares is that
+        // every module derives the same label tweak.
+        sp_codes.push(if is_labeled[i] != 0 {
+            let label = SilentPaymentCode::get_label(scan_seckey, labels[i]);
+            match sp_code.add_label(label) {
+                Ok(labeled) => labeled,
+                Err(_) => return str_to_c_string(LABEL_FAIL),
+            }
+        } else {
+            sp_code
+        });
     }
 
     if diverges_on_intermediate_zero_sum(&secp, &spks_with_keys) {

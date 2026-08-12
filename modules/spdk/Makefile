@@ -2,7 +2,14 @@ all: module.a
 
 CXXFLAGS += -Wall -Wextra -fsanitize=address,fuzzer -std=c++20 -I ../../include
 
-SPDK_LIB_PATH := ./spdk_lib/target/release/libspdk_lib.a
+# The label API lives behind the crate's receiving feature, which pulls in
+# serde_derive. That is a proc macro, so it is built for the host and loaded
+# back into rustc: with the sanitizer RUSTFLAGS below applied to it, the .so
+# fails to load for lack of an ASan runtime. Naming the host target explicitly
+# confines those flags to the target artifacts, which is where the coverage
+# instrumentation is wanted anyway, at the cost of a triple in the output path.
+RUST_HOST := $(shell rustc +nightly -vV | sed -n 's/^host: //p')
+SPDK_LIB_PATH := ./spdk_lib/target/$(RUST_HOST)/release/libspdk_lib.a
 
 # Namespace this module's vendored libsecp256k1 so it can be linked alongside
 # other Rust modules pinning the same secp256k1-sys version.
@@ -18,7 +25,7 @@ $(SPDK_LIB_PATH):
 		-C llvm-args=-sanitizer-coverage-pc-table \
 		-C llvm-args=-sanitizer-coverage-level=4 \
 		-C llvm-args=-simplifycfg-branch-fold-threshold=0" \
-	cargo +nightly build --release
+	cargo +nightly build --release --target $(RUST_HOST)
 
 cargo: $(SPDK_LIB_PATH)
 

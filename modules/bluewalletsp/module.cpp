@@ -87,8 +87,19 @@ std::optional<std::string> BlueWalletSp::silentpayments_create_outputs(
       input.input_seckeys.size() != num_inputs * 32 ||
       input.input_is_taproot.size() != num_inputs ||
       input.scan_seckeys.size() != num_recipients * 32 ||
-      input.spend_seckeys.size() != num_recipients * 32) {
+      input.spend_seckeys.size() != num_recipients * 32 ||
+      input.recipient_is_labeled.size() != num_recipients ||
+      input.recipient_labels.size() != num_recipients) {
     return std::nullopt;
+  }
+
+  // The library has no label API: it derives no label tweak and its address
+  // type carries no label, so there is nothing here to compare against the
+  // modules that do. Labeled recipients are dropped rather than answered with
+  // the unlabeled outputs, which would be a mismatch of this wrapper's making.
+  for (const uint8_t is_labeled : input.recipient_is_labeled) {
+    if (is_labeled)
+      return std::nullopt;
   }
 
   if (!start_runner())

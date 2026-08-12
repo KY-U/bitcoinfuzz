@@ -49,6 +49,15 @@ struct SilentPaymentsCreateOutputsInput {
   // reachable.
   std::vector<uint8_t> scan_seckeys;
   std::vector<uint8_t> spend_seckeys;
+  // One flag per recipient, non-zero when that recipient's address is labeled.
+  // A labeled address replaces its spend public key with B_spend + m*G, where
+  // m = hash_BIP0352/Label(scan_seckey || ser32(label)), so each module has to
+  // derive the tweak with its own label API before sending. Modules without one
+  // return nullopt for these inputs.
+  std::vector<uint8_t> recipient_is_labeled;
+  // One label integer per recipient, meaningful only where the flag is set.
+  // Drawn from a small pool so the same label repeats across recipients.
+  std::vector<uint32_t> recipient_labels;
 };
 
 class BaseModule {

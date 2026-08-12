@@ -861,6 +861,13 @@ void Driver::SilentPaymentsCreateOutputsTarget(
   // and groups are where the k counter is incremented per output.
   const size_t num_scan_keys =
       provider.ConsumeIntegralInRange<size_t>(1, num_recipients);
+  // Labels come from a small pool rather than one per recipient: support is
+  // thin and inconsistent across implementations, and the interesting shapes
+  // are a label reused by several recipients and a labeled address sharing a
+  // group with an unlabeled one. An empty pool leaves every recipient
+  // unlabeled, which keeps the modules that have no label API in the
+  // comparison for those inputs.
+  const size_t num_labels = provider.ConsumeIntegralInRange<size_t>(0, 3);
 
   SilentPaymentsCreateOutputsInput input;
 
@@ -881,6 +888,12 @@ void Driver::SilentPaymentsCreateOutputsTarget(
   if (scan_key_pool.size() != num_scan_keys * 32)
     return;
 
+  std::vector<uint32_t> label_pool;
+  label_pool.reserve(num_labels);
+  for (size_t i = 0; i < num_labels; ++i) {
+    label_pool.push_back(provider.ConsumeIntegral<uint32_t>());
+  }
+
   input.scan_seckeys.reserve(num_recipients * 32);
   input.spend_seckeys = provider.ConsumeBytes<uint8_t>(num_recipients * 32);
   if (input.spend_seckeys.size() != num_recipients * 32)
@@ -890,6 +903,13 @@ void Driver::SilentPaymentsCreateOutputsTarget(
         provider.ConsumeIntegralInRange<size_t>(0, num_scan_keys - 1);
     const auto begin = scan_key_pool.begin() + (scan_key_index * 32);
     input.scan_seckeys.insert(input.scan_seckeys.end(), begin, begin + 32);
+
+    const bool is_labeled = !label_pool.empty() && provider.ConsumeBool();
+    input.recipient_is_labeled.push_back(is_labeled ? 1 : 0);
+    input.recipient_labels.push_back(
+        is_labeled ? label_pool[provider.ConsumeIntegralInRange<size_t>(
+                         0, num_labels - 1)]
+                   : 0);
   }
 
   std::optional<std::string> last_response{std::nullopt};

@@ -19,6 +19,12 @@ alone.
 
 `node` must be on `PATH` **at runtime**, not just at build time.
 
+## No label support
+
+The library derives no BIP-352 label tweak and its address type carries no
+label, so `module.cpp` drops recipients that the target labeled instead of
+answering with the unlabeled outputs. Every unlabeled input is still compared.
+
 ## Build
 
 ```bash

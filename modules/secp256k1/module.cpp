@@ -471,6 +471,12 @@ std::optional<std::string> secp256k1_musig2_sign_session(
 // not a skip: both libraries see the same bytes, so both must reject them.
 constexpr const char *SILENTPAYMENTS_INVALID_SECKEY = "INVALID_SECKEY";
 
+// Returned when deriving a labeled spend public key is rejected. Both steps
+// only fail on a hash landing outside the curve order or on a label that
+// negates the spend key, so any module reaching this while another succeeds is
+// a real disagreement rather than a shared edge case.
+constexpr const char *SILENTPAYMENTS_LABEL_FAIL = "LABEL_FAIL";
+
 std::optional<std::string> secp256k1_silentpayments_create_outputs(
     const bitcoinfuzz::SilentPaymentsCreateOutputsInput &input) {
   const size_t num_inputs = input.input_seckeys.size() / 32;
@@ -479,7 +485,9 @@ std::optional<std::string> secp256k1_silentpayments_create_outputs(
       input.input_seckeys.size() != num_inputs * 32 ||
       input.input_is_taproot.size() != num_inputs ||
       input.scan_seckeys.size() != num_recipients * 32 ||
-      input.spend_seckeys.size() != num_recipients * 32) {
+      input.spend_seckeys.size() != num_recipients * 32 ||
+      input.recipient_is_labeled.size() != num_recipients ||
+      input.recipient_labels.size() != num_recipients) {
     return std::nullopt;
   }
 
@@ -530,6 +538,25 @@ std::optional<std::string> secp256k1_silentpayments_create_outputs(
         !secp256k1_ec_pubkey_create(secp256k1_ctx, &recipients[i].spend_pubkey,
                                     spend_seckey)) {
       return SILENTPAYMENTS_INVALID_SECKEY;
+    }
+    // A labeled address carries B_spend + m*G in place of the spend pubkey.
+    // The sender does not know the difference, so the only thing being compared
+    // here is that every module derives the same label tweak.
+    if (input.recipient_is_labeled[i]) {
+      secp256k1_silentpayments_label label;
+      unsigned char label_tweak32[32];
+      // Not written in place: the call clears its output before reading its
+      // input, so aliasing the two would hand it a zeroed spend pubkey.
+      secp256k1_pubkey labeled_spend_pubkey;
+      if (!secp256k1_silentpayments_recipient_label_create(
+              secp256k1_ctx, &label, label_tweak32, scan_seckey,
+              input.recipient_labels[i]) ||
+          !secp256k1_silentpayments_recipient_create_labeled_spend_pubkey(
+              secp256k1_ctx, &labeled_spend_pubkey, &recipients[i].spend_pubkey,
+              &label)) {
+        return SILENTPAYMENTS_LABEL_FAIL;
+      }
+      recipients[i].spend_pubkey = labeled_spend_pubkey;
     }
     recipients[i].index = i;
     recipient_ptrs[i] = &recipients[i];

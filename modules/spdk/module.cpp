@@ -14,17 +14,21 @@ std::optional<std::string> Spdk::silentpayments_create_outputs(
       input.input_seckeys.size() != num_inputs * 32 ||
       input.input_is_taproot.size() != num_inputs ||
       input.scan_seckeys.size() != num_recipients * 32 ||
-      input.spend_seckeys.size() != num_recipients * 32) {
+      input.spend_seckeys.size() != num_recipients * 32 ||
+      input.recipient_is_labeled.size() != num_recipients ||
+      input.recipient_labels.size() != num_recipients) {
     return std::nullopt;
   }
 
   // Returns the recipient ordered outputs as hex, or an "INVALID_SECKEY" /
-  // "CREATE_FAIL" rejection sentinel, matching the secp256k1 module. Null means
-  // the arguments were malformed, which the checks above already rule out.
+  // "CREATE_FAIL" / "LABEL_FAIL" rejection sentinel, matching the secp256k1
+  // module. Null means the arguments were malformed, which the checks above
+  // already rule out.
   char *result = ::spdk_create_outputs(
       input.outpoint_smallest.data(), input.input_seckeys.data(),
       input.input_is_taproot.data(), num_inputs, input.scan_seckeys.data(),
-      input.spend_seckeys.data(), num_recipients);
+      input.spend_seckeys.data(), input.recipient_is_labeled.data(),
+      input.recipient_labels.data(), num_recipients);
   if (!result)
     return std::nullopt;
 
