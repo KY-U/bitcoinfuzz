@@ -142,6 +142,10 @@ ifneq ($(findstring -DBDK_SP,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
 	MODULES += modules/bdksp/module.a
 endif
 
+ifneq ($(findstring -DBLUEWALLET_SP,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
+	MODULES += modules/bluewalletsp/module.a
+endif
+
 ifeq ($(UNAME_S), Darwin)
 	LDFLAGS = -framework CoreFoundation -Wl,-ld_classic
 endif

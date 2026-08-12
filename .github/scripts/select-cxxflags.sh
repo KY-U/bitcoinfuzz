@@ -38,6 +38,7 @@ declare -A MODULE_FLAGS=(
   [rustmusig2]="-DRUST_MUSIG2"
   [rustcryptoaes]="-DRUSTCRYPTO_AES"
   [bdksp]="-DBDK_SP"
+  [bluewalletsp]="-DBLUEWALLET_SP"
   [rustreexo]="-DRUSTREEXO"
   [utreexo]="-DUTREEXO"
   [pycoin]="-DPYCOIN"

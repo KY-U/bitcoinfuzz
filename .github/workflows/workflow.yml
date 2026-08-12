@@ -111,6 +111,7 @@ jobs:
           -DRUST_MUSIG2 \
           -DRUSTCRYPTO_AES \
           -DBDK_SP \
+          -DBLUEWALLET_SP \
           -DBTCD \
           -DNBITCOIN \
           -DEMBIT \
@@ -303,7 +304,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "silentpayments_create_outputs"
             target: "silentpayments_create_outputs"
-            cxxflags: "-DBDK_SP -DSECP256K1"
+            cxxflags: "-DBDK_SP -DBLUEWALLET_SP -DSECP256K1"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
 
     steps:
