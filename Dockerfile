@@ -114,6 +114,24 @@ RUN \
     --mount=type=cache,target=/root/go/pkg/mod,id=fuzz-go-mod \
     export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-$(dpkg --print-architecture) && \
     /build/scripts/auto_build.py
+
+# The builder only compiles the modules named in CXXFLAGS, so the JS runner
+# exists only when BLUEWALLET_SP was selected. COPY --from=builder of a path a
+# build never produced aborts that build, so stage the payload through a
+# directory that is always there and let the runner copy that instead.
+FROM builder AS bluewalletsp-assets
+RUN set -eu; \
+    src=/build/modules/bluewalletsp/ts; \
+    dst=/assets/modules/bluewalletsp/ts; \
+    mkdir -p "$dst"; \
+    if [ -d "$src/dist" ]; then \
+        cp -r "$src/dist" "$dst/dist"; \
+        mkdir -p "$dst/node_modules"; \
+        cp -r "$src/node_modules/tiny-secp256k1" "$dst/node_modules/tiny-secp256k1"; \
+    else \
+        echo "bluewalletsp not built (no -DBLUEWALLET_SP); skipping its JS runtime"; \
+    fi
+
 FROM base AS runner
 LABEL org.opencontainers.image.title="Bitcoin Fuzz"
 LABEL org.opencontainers.image.description="Bitcoin fuzzing framework for security testing Bitcoin implementations"
@@ -150,14 +168,10 @@ COPY --from=builder --parents \
 
 # bluewalletsp runs its library on node. Only the transpiled runner and
 # tiny-secp256k1 are needed: everything else is bundled, and tiny-secp256k1 is
-# left external so it can find its .wasm alongside itself.
+# left external so it can find its .wasm alongside itself. The stage above
+# leaves the tree empty when the module was not part of this build.
 ENV BLUEWALLET_SP_RUNNER=/app/modules/bluewalletsp/ts/dist/index.js
-COPY --from=builder \
-    /build/modules/bluewalletsp/ts/dist \
-    /app/modules/bluewalletsp/ts/dist
-COPY --from=builder \
-    /build/modules/bluewalletsp/ts/node_modules/tiny-secp256k1 \
-    /app/modules/bluewalletsp/ts/node_modules/tiny-secp256k1
+COPY --from=bluewalletsp-assets /assets/ /app/
 # Transform envs into cli params using the defaults (some sane defaults)
 # from the website https://llvm.org/docs/LibFuzzer.html#options
 # mkdir to init and make sure we have write permissions
