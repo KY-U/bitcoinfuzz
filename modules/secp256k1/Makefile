@@ -19,6 +19,7 @@ $(SECP256K1_LIB):
 		--enable-experimental \
 		--enable-module-schnorrsig \
 		--enable-module-musig \
+		--enable-module-silentpayments \
 		--disable-shared \
 		--with-pic \
 		CFLAGS="-fsanitize=address,fuzzer-no-link" && \

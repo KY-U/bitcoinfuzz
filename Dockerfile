@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.20
 FROM ubuntu:24.04 AS base
-# llvm-symbolizer devs, python and sodium libs and jre
+# llvm-symbolizer devs, python and sodium libs, jre, and node
 RUN --mount=type=cache,target=/var/cache/apt,id=fuzz-apt-cache-base \
     --mount=type=cache,target=/var/lib/apt/lists,id=fuzz-apt-lists-base \
     apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
@@ -8,6 +8,7 @@ RUN --mount=type=cache,target=/var/cache/apt,id=fuzz-apt-cache-base \
     libllvm18 \
     libpython3-dev \
     libsodium-dev \
+    nodejs \
     openjdk-21-jre-headless
 FROM base AS builder
 ENV DEBIAN_FRONTEND=noninteractive
@@ -146,6 +147,17 @@ COPY --from=builder --parents \
     --exclude=modules/bitcoin/secp256k1/tools \
     --exclude=modules/**/target \
     /build/./modules/**/*.py .
+
+# bluewalletsp runs its library on node. Only the transpiled runner and
+# tiny-secp256k1 are needed: everything else is bundled, and tiny-secp256k1 is
+# left external so it can find its .wasm alongside itself.
+ENV BLUEWALLET_SP_RUNNER=/app/modules/bluewalletsp/ts/dist/index.js
+COPY --from=builder \
+    /build/modules/bluewalletsp/ts/dist \
+    /app/modules/bluewalletsp/ts/dist
+COPY --from=builder \
+    /build/modules/bluewalletsp/ts/node_modules/tiny-secp256k1 \
+    /app/modules/bluewalletsp/ts/node_modules/tiny-secp256k1
 # Transform envs into cli params using the defaults (some sane defaults)
 # from the website https://llvm.org/docs/LibFuzzer.html#options
 # mkdir to init and make sure we have write permissions

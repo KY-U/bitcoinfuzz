@@ -143,6 +143,9 @@ contains the module-specific build commands, dependencies, and notes.
 | [NBitcoin-Secp256k1](https://github.com/MetacoSA/NBitcoin/tree/master/NBitcoin.Secp256k1) | `NBITCOIN_SECP256K1` | [modules/nbitcoinsecp256k1/README.md](./modules/nbitcoinsecp256k1/README.md) |
 | [rust-musig2](https://github.com/conduition/rust-musig2) | `RUST_MUSIG2` | [modules/rustmusig2/README.md](./modules/rustmusig2/README.md) |
 | [RustCrypto AES](https://github.com/RustCrypto/block-ciphers/tree/master/aes) | `RUSTCRYPTO_AES` | [modules/rustcryptoaes/README.md](./modules/rustcryptoaes/README.md) |
+| [bdk-sp](https://github.com/bitcoindevkit/bdk-sp) | `BDK_SP` | [modules/bdksp/README.md](./modules/bdksp/README.md) |
+| [BlueWallet SilentPayments](https://github.com/BlueWallet/SilentPayments) | `BLUEWALLET_SP` | [modules/bluewalletsp/README.md](./modules/bluewalletsp/README.md) |
+| [spdk](https://github.com/cygnet3/spdk) | `SPDK` | [modules/spdk/README.md](./modules/spdk/README.md) |
 
 ### Utreexo Modules
 

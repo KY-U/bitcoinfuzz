@@ -1,0 +1,12 @@
+[lib]
+name = "sp_lib"
+crate-type = ["staticlib"]
+
+[package]
+name = "sp_lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hex = "0.4.3"
+bdk_sp = { git = "https://github.com/bitcoindevkit/bdk-sp", rev = "3d8aa5892483b374240aa7a208a271f78b0a250a" }

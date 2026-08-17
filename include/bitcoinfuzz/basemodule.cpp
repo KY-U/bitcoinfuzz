@@ -193,4 +193,9 @@ std::optional<std::string> BaseModule::musig2_sign_session(
   return std::nullopt;
 }
 
+std::optional<std::string> BaseModule::silentpayments_create_outputs(
+    const SilentPaymentsCreateOutputsInput & /*input*/) const {
+  return std::nullopt;
+}
+
 } // namespace bitcoinfuzz

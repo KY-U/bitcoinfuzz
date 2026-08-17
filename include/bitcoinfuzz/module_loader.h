@@ -153,6 +153,18 @@
 #include <modules/rustcryptoaes/module.h>
 #endif
 
+#ifdef BDK_SP
+#include <modules/bdksp/module.h>
+#endif
+
+#ifdef BLUEWALLET_SP
+#include <modules/bluewalletsp/module.h>
+#endif
+
+#ifdef SPDK
+#include <modules/spdk/module.h>
+#endif
+
 #ifdef CUSTOM_MUTATOR_BOLT12_OFFER
 #include <custommutator/mutators/bolt12_offer.h>
 #endif
