@@ -113,5 +113,28 @@ Rustbitcoin::bip32_derive_from_path(std::span<const uint8_t> buffer) const {
   return result;
 }
 
+std::optional<std::string>
+Rustbitcoin::decode_ellswift(std::span<const uint8_t> buffer) const {
+  auto result_ptr = rust_bitcoin_decode_ellswift(buffer.data(), buffer.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  free_c_string(result_ptr);
+  return result;
+}
+
+std::optional<std::string>
+Rustbitcoin::roundtrip_ellswift(std::span<const uint8_t> privkey) const {
+  auto result_ptr =
+      rust_bitcoin_roundtrip_ellswift(privkey.data(), privkey.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  free_c_string(result_ptr);
+  return result;
+}
+
 } // namespace module
 } // namespace bitcoinfuzz

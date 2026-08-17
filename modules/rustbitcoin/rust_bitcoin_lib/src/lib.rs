@@ -12,6 +12,8 @@ use bitcoin::encoding::{decode_from_slice, decode_from_slice_unbounded, encode_t
 use bitcoin::script::ScriptExt;
 use bitcoin::script::ScriptPubKeyBuf;
 use bitcoin::script::ScriptPubKeyExt;
+use bitcoin::secp256k1::ellswift::ElligatorSwift;
+use bitcoin::secp256k1::{PublicKey, SecretKey};
 use bitcoin::Block;
 use bitcoin::NetworkKind;
 use p2p::address::AddrV2;
@@ -536,4 +538,36 @@ pub unsafe extern "C" fn rust_bitcoin_bip32_derive_from_path(
         Ok(derived_key) => str_to_c_string(&derived_key.to_string()),
         Err(_) => str_to_c_string("INVALID"),
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rust_bitcoin_decode_ellswift(data: *const u8, len: usize) -> *mut c_char {
+    if data.is_null() || len != 64 {
+        return ptr::null_mut();
+    }
+
+    let encoded_bytes: [u8; 64] = slice::from_raw_parts(data, len).try_into().unwrap();
+    let encoded = ElligatorSwift::from_array(encoded_bytes);
+    let public_key = PublicKey::from_ellswift(encoded);
+    str_to_c_string(&public_key.to_string())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rust_bitcoin_roundtrip_ellswift(
+    data: *const u8,
+    len: usize,
+) -> *mut c_char {
+    if data.is_null() || len != 32 {
+        return ptr::null_mut();
+    }
+
+    let secret_bytes: [u8; 32] = slice::from_raw_parts(data, len).try_into().unwrap();
+    let secret_key = match SecretKey::from_secret_bytes(secret_bytes) {
+        Ok(secret_key) => secret_key,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let encoded = ElligatorSwift::from_seckey(secret_key, None);
+    let public_key = PublicKey::from_ellswift(encoded);
+    str_to_c_string(&public_key.to_string())
 }
