@@ -5,17 +5,28 @@
 # Usage: rename_cgo_symbols.sh <archive> <prefix>
 #
 # When Go builds a c-archive (-buildmode=c-archive), it bundles CGO runtime
-# support symbols (e.g. _cgo_topofstack, _cgo_panic, crosscall2) into the
-# archive. Linking two or more such archives in the same binary causes
+# support symbols (e.g. _cgo_topofstack, _cgo_panic, crosscall2, threadentry)
+# into the archive. Linking two or more such archives in the same binary causes
 # "multiple definition" linker errors.
 #
-# This script renames every globally-visible CGO runtime symbol to
-# PREFIX_<original_name> using objcopy --redefine-syms. Both the definition
-# and all internal references are updated, so each module's CGO runtime
-# becomes self-contained under its own namespace.
+# This script renames every globally-visible symbol the archive defines to
+# PREFIX_<original_name> using objcopy --redefine-syms, except for the two
+# groups that belong to the module rather than to the CGO runtime:
 #
-# Module-specific CGO symbols (those containing a 12-char hex hash such as
-# _cgo_0ada0d83d011_Cfunc_free) are left untouched.
+#   * Everything the generated cgo header declares. That header is the
+#     archive's public surface -- the //export'ed Go functions the C++ module
+#     calls -- and is found next to the archive as <archive-basename>.h.
+#   * Module-specific CGO symbols, which carry a 12-char hex hash derived from
+#     the package (e.g. _cgo_0ada0d83d011_Cfunc_free).
+#
+# Selecting by what the module owns rather than by symbol-name patterns matters:
+# the CGO runtime helpers are not consistently named, and the set changes across
+# Go releases. Go 1.27 stopped marking `fatalf` and `threadentry` static when it
+# merged the per-arch gcc_linux_amd64.c into gcc_unix.c, and a pattern matching
+# only _cgo_*/x_cgo_*/crosscall* silently stopped covering the runtime.
+#
+# Both the definition and all internal references are updated, so each module's
+# CGO runtime becomes self-contained under its own namespace.
 #
 # Requires: nm, ar, ranlib, objcopy (or llvm-objcopy)
 
@@ -36,6 +47,7 @@ fi
 
 # Resolve to absolute path before changing directories
 ARCHIVE="$(cd "$(dirname "$ARCHIVE")" && pwd)/$(basename "$ARCHIVE")"
+HEADER="${ARCHIVE%.a}.h"
 
 # Find objcopy (prefer llvm-objcopy on macOS where GNU objcopy is unavailable)
 OBJCOPY=$(command -v objcopy 2>/dev/null || command -v llvm-objcopy 2>/dev/null || echo "")
@@ -48,23 +60,39 @@ WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 MAP_FILE="$WORK_DIR/cgo_runtime.map"
+KEEP_FILE="$WORK_DIR/keep.txt"
+DEFINED_FILE="$WORK_DIR/defined.txt"
 
-# Find all globally-visible CGO runtime symbols in the archive.
-#
-# CGO runtime symbols match: _cgo_*, x_cgo_*, crosscall1, crosscall2, and
-# derived names like _x_crosscall2_ptr.
-#
-# Module-specific CGO symbols contain a 12-char lowercase hex hash (e.g.
-# _cgo_0ada0d83d011_Cfunc_free or _cgoexp_0ada0d83d011_MyFunc) and must be
-# excluded so the exported Go functions remain accessible under their
-# original names.
+# Every global symbol the archive defines, minus the module-specific CGO
+# symbols carrying a 12-char hex package hash.
 #
 # nm type letters: T=text D=data B=bss R=rodata S=other-section (all global)
 nm "$ARCHIVE" 2>/dev/null \
     | awk '/ [TDBRS] / { print $NF }' \
-    | grep -E '(_cgo_|x_cgo_|crosscall)' \
     | grep -vE '[0-9a-f]{12}' \
-    | sort -u \
+    | sort -u > "$DEFINED_FILE"
+
+# Names declared by the generated cgo header: the archive's public surface,
+# which must keep its original spelling for the C++ module to link against.
+if [ -f "$HEADER" ]; then
+    awk '/^extern[ \t]/ {
+            decl = $0
+            paren = index(decl, "(")
+            if (paren > 0)
+                decl = substr(decl, 1, paren - 1)
+            gsub(/[^A-Za-z0-9_]/, " ", decl)
+            count = split(decl, parts, " ")
+            if (count > 0)
+                print parts[count]
+         }' "$HEADER" | sort -u > "$KEEP_FILE"
+else
+    # No header next to the archive: fall back to matching the CGO runtime by
+    # name, which is what this script did before it could consult the header.
+    echo "Warning: $(basename "$HEADER") not found, matching CGO runtime symbols by name." >&2
+    grep -vE '(_cgo_|x_cgo_|crosscall)' "$DEFINED_FILE" | sort -u > "$KEEP_FILE"
+fi
+
+comm -23 "$DEFINED_FILE" "$KEEP_FILE" \
     | while IFS= read -r sym; do
         printf '%s %s_%s\n' "$sym" "$PREFIX" "$sym"
     done > "$MAP_FILE"
