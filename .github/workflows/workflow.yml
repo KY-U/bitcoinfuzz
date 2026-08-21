@@ -79,6 +79,7 @@ jobs:
           pip install -r modules/embit/requirements.txt
           pip install -r modules/pybitcoinkernel/requirements.txt
           pip install -r modules/pycoin/requirements.txt
+          pip install -r modules/electrum/requirements.txt
           pip install mako
 
       - name: Build Modules
@@ -118,6 +119,7 @@ jobs:
           -DRUSTREEXO \
           -DUTREEXO \
           -DPYCOIN \
+          -DELECTRUM \
           -DLIBBITCOIN_SYSTEM" \
           ONLY_MODULES=1 \
           ./scripts/auto_build.py
@@ -215,7 +217,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "bip32_master_keygen"
             target: "bip32_master_keygen"
-            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBTCD -DBITCOINJ -DLIBWALLY_CORE -DEMBIT -DPYCOIN -DBITCOINS -DLIBBITCOIN_SYSTEM"
+            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBTCD -DBITCOINJ -DLIBWALLY_CORE -DELECTRUM -DEMBIT -DPYCOIN -DBITCOINS -DLIBBITCOIN_SYSTEM"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
             setup_java: "true"
           - corpus: "private_to_public_key"
@@ -248,7 +250,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "bip32_deserialize_extended_key_clean"
             target: "bip32_deserialize_extended_key"
-            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBITCOINJ -DLIBWALLY_CORE -DEMBIT -DPYCOIN -DBITCOINS -DBTCD -DCUSTOM_MUTATOR_EXTENDED_KEY -DLIBBITCOIN_SYSTEM"
+            cxxflags: "-DNBITCOIN -DRUST_BITCOIN -DBITCOIN_CORE -DBITCOINJ -DLIBWALLY_CORE -DELECTRUM -DEMBIT -DPYCOIN -DBITCOINS -DBTCD -DCUSTOM_MUTATOR_EXTENDED_KEY -DLIBBITCOIN_SYSTEM"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
             setup_java: "true"
           - corpus: "transaction_eval"

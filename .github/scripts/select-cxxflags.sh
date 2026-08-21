@@ -22,6 +22,7 @@ declare -A MODULE_FLAGS=(
   [eclair]="-DECLAIR"
   [nlightning]="-DNLIGHTNING"
   [embit]="-DEMBIT"
+  [electrum]="-DELECTRUM"
   [pybitcoinkernel]="-DPYBITCOINKERNEL"
   [rustbitcoinkernel]="-DRUSTBITCOINKERNEL"
   [bitcoinkernel]="-DBITCOINKERNEL"
