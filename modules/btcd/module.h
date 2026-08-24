@@ -39,6 +39,8 @@ public:
                  std::span<const uint8_t> sign) const override;
   std::optional<std::string> bip32_deserialize_extended_key(
       std::span<const uint8_t> buffer) const override;
+  std::optional<std::string> merkle_root_compute(
+      const std::vector<std::vector<uint8_t>> &hashes) const override;
   ~Btcd() noexcept override = default;
 };
 

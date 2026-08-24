@@ -19,3 +19,5 @@ extern "C" char *rust_bitcoin_bip32_derive_from_path(const uint8_t *data,
 extern "C" char *rust_bitcoin_decode_ellswift(const uint8_t *data, size_t len);
 extern "C" char *rust_bitcoin_roundtrip_ellswift(const uint8_t *data,
                                                  size_t len);
+extern "C" char *rust_bitcoin_merkle_root_compute(const uint8_t *data,
+                                                  size_t len);

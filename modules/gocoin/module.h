@@ -20,6 +20,8 @@ public:
   std::optional<bool> script_eval(const std::vector<uint8_t> &input_data,
                                   unsigned int flags,
                                   size_t version) const override;
+  std::optional<std::string> merkle_root_compute(
+      const std::vector<std::vector<uint8_t>> &hashes) const override;
 
   ~Gocoin() noexcept override = default;
 };

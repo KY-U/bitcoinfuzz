@@ -9,6 +9,7 @@ const TranslateFn G_TRANSLATION_FUN{nullptr};
 #include "base58.h"
 #include "blockencodings.h"
 #include "chainparams.h"
+#include "consensus/merkle.h"
 #include "consensus/tx_check.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -412,6 +413,24 @@ Bitcoin::transaction_eval(std::span<const uint8_t> buffer) const {
   res += std::to_string(tx.ComputeTotalSize());
 
   return res;
+}
+
+std::optional<std::string> Bitcoin::merkle_root_compute(
+    const std::vector<std::vector<uint8_t>> &hashes) const {
+  std::vector<uint256> leaves;
+  leaves.reserve(hashes.size());
+  for (const auto &hash : hashes) {
+    if (hash.size() != 32)
+      return std::nullopt;
+    // Input bytes are the hash in internal (serialized) byte order.
+    leaves.emplace_back(std::span<const uint8_t>{hash});
+  }
+
+  bool mutated{false};
+  const uint256 root{ComputeMerkleRoot(std::move(leaves), &mutated)};
+
+  // Root in display byte order, plus the CVE-2012-2459 mutation flag.
+  return root.ToString() + ";mutated=" + (mutated ? "1" : "0");
 }
 
 std::optional<std::string> Bitcoin::address_parse(std::string str) const {

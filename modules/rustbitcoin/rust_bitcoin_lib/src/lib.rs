@@ -370,6 +370,35 @@ pub unsafe extern "C" fn rust_bitcoin_cmpctblocks_parse(
     }
 }
 
+/// Computes the merkle root over a list of raw 32-byte hashes (internal byte
+/// order, concatenated). Prints the root in display byte order.
+///
+/// `TxMerkleNode::calculate_root` returns `None` for empty lists and for
+/// lists containing the consecutive duplicates that trigger CVE-2012-2459.
+/// The driver never feeds empty lists, so `None` here maps to the "REJECTED"
+/// sentinel: refusing to compute a mutated root is treated as agreeing with
+/// modules that compute the root but report `mutated=1` (Bitcoin Core,
+/// gocoin).
+#[no_mangle]
+pub unsafe extern "C" fn rust_bitcoin_merkle_root_compute(
+    data: *const u8,
+    len: usize,
+) -> *mut c_char {
+    if len % 32 != 0 {
+        return ptr::null_mut();
+    }
+
+    let data_slice = slice::from_raw_parts(data, len);
+    let leaves = data_slice
+        .chunks_exact(32)
+        .map(|chunk| bitcoin::Txid::from_byte_array(chunk.try_into().expect("chunk of 32 bytes")));
+
+    match bitcoin::merkle_tree::TxMerkleNode::calculate_root(leaves) {
+        Some(root) => str_to_c_string(&format!("{};mutated=0", root)),
+        None => str_to_c_string("REJECTED"),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn rust_bitcoin_bip32_master_keygen(
     data: *const u8,

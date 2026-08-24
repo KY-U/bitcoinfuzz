@@ -137,6 +137,15 @@ public:
   virtual std::optional<std::string>
   stump_modify_add(const std::vector<std::vector<uint8_t>> &add_hashes) const;
 
+  // Computes the merkle root over a list of raw 32-byte hashes (given in
+  // internal byte order, as serialized in a block). The response is either
+  // "<root_hex>;mutated=0|1" (root in display byte order, plus whether a
+  // CVE-2012-2459-style duplicated subtree was detected) or the sentinel
+  // "REJECTED" when the library refuses to compute a root for the list at
+  // all (e.g. rust-bitcoin returns None for mutated lists).
+  virtual std::optional<std::string>
+  merkle_root_compute(const std::vector<std::vector<uint8_t>> &hashes) const;
+
   virtual std::optional<std::string>
   bip32_derive_from_path(std::span<const uint8_t> buffer) const;
   virtual std::optional<std::string>

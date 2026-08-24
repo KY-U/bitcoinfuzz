@@ -102,6 +102,15 @@ extern int GocoinVerifyTxScript(ByteArray scriptSig, ByteArray scriptPubKey);
 //
 extern int GocoinEvalScript(ByteArray scriptData, uint32_t flags, size_t version);
 
+// GocoinMerkleRootCompute computes the merkle root over a list of raw 32-byte
+// hashes (internal byte order, concatenated) and reports whether a duplicated
+// subtree (CVE-2012-2459) was detected.
+//
+// Input: data is n*32 bytes (n >= 1; the driver never feeds empty lists).
+// Output: "<root_hex>;mutated=0|1" with the root in display byte order.
+//
+extern char* GocoinMerkleRootCompute(ByteArray data);
+
 // GocoinFreeString frees a C string that was allocated by Go.
 // Must be called to prevent memory leaks.
 //

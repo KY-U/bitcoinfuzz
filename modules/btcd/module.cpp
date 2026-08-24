@@ -114,6 +114,29 @@ Btcd::transaction_eval(std::span<const uint8_t> buffer) const {
   BTCDFreeString(result);
   return res;
 }
+
+std::optional<std::string> Btcd::merkle_root_compute(
+    const std::vector<std::vector<uint8_t>> &hashes) const {
+  // Flatten the 32-byte hashes into a single buffer for the FFI call.
+  std::vector<uint8_t> flat;
+  flat.reserve(hashes.size() * 32);
+  for (const auto &hash : hashes) {
+    if (hash.size() != 32)
+      return std::nullopt;
+    flat.insert(flat.end(), hash.begin(), hash.end());
+  }
+
+  ByteArray data{.data = reinterpret_cast<char *>(flat.data()),
+                 .length = static_cast<int>(flat.size())};
+
+  char *result = BTCDMerkleRootCompute(data);
+  if (!result)
+    return std::nullopt;
+
+  std::string res(result);
+  BTCDFreeString(result);
+  return res;
+}
 std::optional<std::string>
 Btcd::bip32_master_keygen(std::span<const uint8_t> buffer) const {
   ByteArray seed;

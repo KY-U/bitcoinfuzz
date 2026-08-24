@@ -32,6 +32,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/v2"
 	"github.com/btcsuite/btcd/btcutil/v2/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg/v2"
+	"github.com/btcsuite/btcd/chainhash/v2"
 	"github.com/btcsuite/btcd/psbt/v2"
 	"github.com/btcsuite/btcd/txscript/v2"
 	"github.com/btcsuite/btcd/wire/v2"
@@ -233,6 +234,59 @@ func BTCDDesBlock(scriptData C.ByteArray) *C.char {
 //export BTCDFreeString
 func BTCDFreeString(ptr *C.char) {
 	C.free(unsafe.Pointer(ptr))
+}
+
+// BTCDMerkleRootCompute computes the merkle root over a list of raw 32-byte
+// hashes (internal byte order, concatenated) and reports whether a duplicated
+// subtree (CVE-2012-2459) was detected.
+//
+// btcd's exported merkle entry points (CalcMerkleRoot, BuildMerkleTreeStore)
+// operate on []*btcutil.Tx rather than raw hashes, so the tree reduction
+// below mirrors Bitcoin Core's ComputeMerkleRoot (duplicate the last hash on
+// odd levels, hash pairs left to right) while the consensus-critical pair
+// hashing itself is btcd's exported HashMerkleBranches (double SHA256 of the
+// concatenated branches).
+//
+// Input: data is n*32 bytes (n >= 1; the driver never feeds empty lists).
+// Output: "<root_hex>;mutated=0|1" with the root in display byte order.
+//
+//export BTCDMerkleRootCompute
+func BTCDMerkleRootCompute(data C.ByteArray) *C.char {
+	input := C.GoBytes(unsafe.Pointer(data.data), C.int(data.length))
+	if len(input) == 0 || len(input)%32 != 0 {
+		return nil
+	}
+
+	count := len(input) / 32
+	hashes := make([]chainhash.Hash, count)
+	for i := 0; i < count; i++ {
+		copy(hashes[i][:], input[i*32:(i+1)*32])
+	}
+
+	mutated := false
+	for len(hashes) > 1 {
+		// Detect duplicated subtrees (CVE-2012-2459): any two consecutive
+		// hashes at even offsets before the odd-level duplication.
+		for pos := 0; pos+1 < len(hashes); pos += 2 {
+			if hashes[pos] == hashes[pos+1] {
+				mutated = true
+			}
+		}
+		if len(hashes)%2 != 0 {
+			hashes = append(hashes, hashes[len(hashes)-1])
+		}
+		next := make([]chainhash.Hash, len(hashes)/2)
+		for i := 0; i < len(hashes); i += 2 {
+			next[i/2] = blockchain.HashMerkleBranches(&hashes[i], &hashes[i+1])
+		}
+		hashes = next
+	}
+
+	mutatedFlag := "0"
+	if mutated {
+		mutatedFlag = "1"
+	}
+	return C.CString(hashes[0].String() + ";mutated=" + mutatedFlag)
 }
 
 //export BTCDTransactionEval
