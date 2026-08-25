@@ -135,9 +135,8 @@ def bip32_master_keygen(data):
 
 
 def bip32_deserialize_extended_key(data: str) -> str:
-
-    data = data.decode()
     try:
+        data = data.decode()
         key: HDKey = HDKey.from_base58(data)
     except Exception:
         return "INVALID"
