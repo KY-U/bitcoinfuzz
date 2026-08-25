@@ -38,7 +38,7 @@ call_python_function(const InputType input, size_t input_len,
   PyObject *input_obj = NULL;
 
   // Import the main Python module containing the parser function
-  main_module = PyImport_ImportModule("main");
+  main_module = PyImport_ImportModule("embit_main");
   if (!main_module) {
     goto cleanup;
   }

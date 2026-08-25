@@ -1,12 +1,14 @@
-all: module.a
+all: module.a ../../pycoin_main.py
 
 CXXFLAGS += -Wall -Wextra -fsanitize=address,fuzzer -std=c++20 -I ../../include
 PYTHON_CFLAGS := $(shell python3-config --includes)
 
+../../pycoin_main.py: pycoin_lib.py
+	cp $< $@
+
 module.a: module.o
 	$(AR) rcs $@ $^
 	ranlib $@
-	cp pycoin_lib.py ../../pycoin_main.py
 
 module.o: module.cpp module.h
 	$(CXX) $(CXXFLAGS) $(PYTHON_CFLAGS) -I . -fPIC -c $< -o $@
