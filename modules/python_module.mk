@@ -1,0 +1,27 @@
+all: module.a ../../$(MODULE_NAME)_main.py
+
+CXXFLAGS += -Wall -Wextra -fsanitize=address,fuzzer -std=c++20 -I ../../include
+PYTHON_CFLAGS := $(shell python3-config --includes)
+
+../../$(MODULE_NAME)_main.py: $(MODULE_NAME)_lib.py
+	cp $< $@
+
+module.a: module.o
+	$(AR) rcs $@ $^
+	ranlib $@
+
+module.o: module.cpp module.h
+	$(CXX) $(CXXFLAGS) $(PYTHON_CFLAGS) -I . -fPIC -c $< -o $@
+
+format:
+	clang-format -i ./module.cpp ./module.h
+	black ./$(MODULE_NAME)_lib.py
+
+check-format:
+	clang-format -Werror --fail-on-incomplete-format -n ./module.cpp ./module.h
+	black --check ./$(MODULE_NAME)_lib.py
+
+clean:
+	rm -rf *.o *.a ./$(MODULE_NAME)_lib/$(MODULE_NAME)_lib.o ../../$(MODULE_NAME)_main.py
+
+.PHONY: all clean format check-format
