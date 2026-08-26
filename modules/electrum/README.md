@@ -13,6 +13,7 @@ pip install -r modules/electrum/requirements.txt
 
 ## Supported targets
 
+- `bip32_master_keygen`
 - `bip32_deserialize_extended_key`
 
 ## Build

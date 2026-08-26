@@ -8,6 +8,8 @@ namespace module {
 class Electrum : public BaseModule {
 public:
   Electrum(void);
+  std::optional<std::string>
+  bip32_master_keygen(std::span<const uint8_t> buffer) const override;
   std::optional<std::string> bip32_deserialize_extended_key(
       std::span<const uint8_t> buffer) const override;
   ~Electrum() noexcept override = default;

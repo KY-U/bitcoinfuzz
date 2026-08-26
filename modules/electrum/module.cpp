@@ -114,6 +114,11 @@ static char *convert_to_string(PyObject *result) {
   return nullptr;
 }
 
+static char *electrum_bip32_master_keygen(const uint8_t *data, size_t len) {
+  return call_python_function<const uint8_t *, char *>(
+      data, len, "bip32_master_keygen", create_bytes_object, convert_to_string);
+}
+
 static char *electrum_bip32_deserialize_extended_key(const uint8_t *data,
                                                      size_t len) {
   return call_python_function<const uint8_t *, char *>(
@@ -125,6 +130,17 @@ namespace bitcoinfuzz {
 namespace module {
 
 Electrum::Electrum(void) : BaseModule("Electrum") {}
+
+std::optional<std::string>
+Electrum::bip32_master_keygen(std::span<const uint8_t> buffer) const {
+  auto result_ptr = electrum_bip32_master_keygen(buffer.data(), buffer.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  free(result_ptr);
+  return result;
+}
 
 std::optional<std::string> Electrum::bip32_deserialize_extended_key(
     std::span<const uint8_t> buffer) const {

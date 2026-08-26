@@ -3,6 +3,14 @@
 from electrum.bip32 import BIP32Node
 
 
+def bip32_master_keygen(data):
+    try:
+        node = BIP32Node.from_rootseed(data, xtype="standard")
+        return node.to_xprv()
+    except Exception:
+        return "INVALID"
+
+
 def bip32_deserialize_extended_key(data):
     try:
         text = data.decode()
