@@ -176,16 +176,8 @@ ifneq ($(findstring -DTINY_MINISCRIPT,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
   TINY_MINISCRIPT_LIB := ./libtiny_miniscript_lib.$(LIB_EXT)
 endif
 
-# Check for EMBIT define and add Python-related flags
-ifneq ($(findstring -DEMBIT,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
-  PYTHON_LDFLAGS := $(shell python3-config --ldflags --embed)
-endif
-
-ifneq ($(findstring -DPYBITCOINKERNEL,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
-  PYTHON_LDFLAGS := $(shell python3-config --ldflags --embed)
-endif
-
-ifneq ($(findstring -DPYCOIN,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
+# Check for Python-based modules and add Python-related flags.
+ifneq (,$(filter -DEMBIT -DPYBITCOINKERNEL -DPYCOIN,$(BASE_CXXFLAGS) $(CXXFLAGS)))
   PYTHON_LDFLAGS := $(shell python3-config --ldflags --embed)
 endif
 
