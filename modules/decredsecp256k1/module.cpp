@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstring>
 
 #include "decredsecp256k1_wrapper/libdecredsecp256k1_wrapper.h"
@@ -95,6 +96,24 @@ Decred_secp256k1::ecdh(std::span<const uint8_t> buffer,
   char *result = DecredECDH(buffer_data, pubkey_data);
   if (!result)
     return std::nullopt;
+
+  std::string result_str(result);
+  free(result);
+  return result_str;
+}
+std::optional<std::string>
+Decred_secp256k1::pubkey_parse(std::span<const uint8_t> buffer) const {
+  ByteArray buffer_data{
+      .data = reinterpret_cast<char *>(const_cast<uint8_t *>(buffer.data())),
+      .length = static_cast<int>(buffer.size())};
+
+  // Unlike the other entry points in this wrapper, DecredPubkeyParse has no
+  // nil path: rejection is reported as "ERR", and C.CString never returns
+  // nil. Assert rather than returning std::nullopt, which the driver reads as
+  // "module does not implement this target" and would silently drop this
+  // module from the comparison.
+  char *result = DecredPubkeyParse(buffer_data);
+  assert(result);
 
   std::string result_str(result);
   free(result);

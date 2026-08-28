@@ -155,4 +155,19 @@ func DecredECDH(privKeyData C.ByteArray, pubKeyData C.ByteArray) *C.char {
 	return C.CString(secretStr)
 }
 
+// DecredPubkeyParse parses a SEC1-encoded public key and returns the
+// canonical compressed encoding ("OK:<hex>"), or "ERR" on rejection.
+//
+//export DecredPubkeyParse
+func DecredPubkeyParse(data C.ByteArray) *C.char {
+	pubKeyBytes := C.GoBytes(unsafe.Pointer(data.data), C.int(data.length))
+
+	pubKey, err := secp.ParsePubKey(pubKeyBytes)
+	if err != nil {
+		return C.CString("ERR")
+	}
+
+	return C.CString("OK:" + hex.EncodeToString(pubKey.SerializeCompressed()))
+}
+
 func main() {}

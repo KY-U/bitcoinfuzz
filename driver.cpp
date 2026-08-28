@@ -503,6 +503,35 @@ void Driver::PrivateToPublicKeyTarget(std::span<const uint8_t> buffer) const {
   }
 }
 
+void Driver::PubkeyParseTarget(std::span<const uint8_t> buffer) const {
+  std::optional<std::string> last_response{std::nullopt};
+  std::string last_module_name;
+
+#ifdef RUST_K256
+  // Known SEC1 encoding-policy splits, skipped for K256 only to keep the
+  // differential meaningful: its sec1 layer has no hybrid tag (rejects
+  // 0x06/0x07 where libsecp256k1 and decred's secp256k1 accept them) and
+  // additionally accepts the compact point encoding (0x05) everyone else
+  // rejects.
+  const bool is_hybrid =
+      buffer.size() == 65 && (buffer[0] == 0x06 || buffer[0] == 0x07);
+  const bool is_compact = buffer.size() == 33 && buffer[0] == 0x05;
+#endif
+
+  for (auto &module : modules) {
+#ifdef RUST_K256
+    if (module.first == "K256" && (is_hybrid || is_compact))
+      continue;
+#endif
+    std::optional<std::string> res{module.second->pubkey_parse(buffer)};
+    if (!res.has_value())
+      continue;
+
+    VerifyMatchingResponse(last_response, last_module_name, module.first, *res,
+                           "Public key parse failed");
+  }
+}
+
 void Driver::SignCompactTarget(std::span<const uint8_t> buffer) const {
   FuzzedDataProvider provider(buffer.data(), buffer.size());
   if (buffer.size() < 64)
@@ -1032,6 +1061,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->KernelBlockCheckTarget(buffer);
   } else if (target == "private_to_public_key") {
     this->PrivateToPublicKeyTarget(buffer);
+  } else if (target == "pubkey_parse") {
+    this->PubkeyParseTarget(buffer);
   } else if (target == "sign_compact") {
     this->SignCompactTarget(buffer);
   } else if (target == "sign_der") {

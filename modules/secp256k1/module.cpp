@@ -72,6 +72,25 @@ secp256k1_private_to_public_key(std::span<const uint8_t> buffer) {
   return hex_encode(pubkey_compressed.data(), pubkey_len);
 }
 
+// Parses a SEC1-encoded public key and returns the canonical compressed
+// encoding, so the driver compares both acceptance and the accepted point.
+std::optional<std::string>
+secp256k1_pubkey_parse(std::span<const uint8_t> buffer) {
+  secp256k1_pubkey pubkey;
+  if (!secp256k1_ec_pubkey_parse(secp256k1_ctx, &pubkey, buffer.data(),
+                                 buffer.size())) {
+    return "ERR";
+  }
+  size_t out_len = SECP256K1_PUBKEY_COMPRESSED_LEN;
+  std::vector<uint8_t> out(out_len);
+  // A pubkey that parsed always serializes: the only failure path in
+  // secp256k1_ec_pubkey_serialize is secp256k1_pubkey_load rejecting the
+  // object, which cannot happen for one just filled in by a successful parse.
+  assert(secp256k1_ec_pubkey_serialize(secp256k1_ctx, out.data(), &out_len,
+                                       &pubkey, SECP256K1_EC_COMPRESSED) == 1);
+  return "OK:" + hex_encode(out.data(), out_len);
+}
+
 std::optional<std::string>
 secp256k1_sign_compact(std::span<const uint8_t> buffer,
                        std::span<const uint8_t> hash) {
@@ -602,6 +621,11 @@ Secp256k1::Secp256k1(void) : BaseModule("Secp256k1") { init(nullptr, nullptr); }
 std::optional<std::string>
 Secp256k1::private_to_public_key(std::span<const uint8_t> buffer) const {
   return secp256k1_private_to_public_key(buffer);
+}
+
+std::optional<std::string>
+Secp256k1::pubkey_parse(std::span<const uint8_t> buffer) const {
+  return secp256k1_pubkey_parse(buffer);
 }
 
 std::optional<std::string>

@@ -1,5 +1,6 @@
 #include "module.h"
 #include "k256_lib/k256_lib.h"
+#include <cassert>
 #include <span>
 
 namespace bitcoinfuzz {
@@ -11,6 +12,20 @@ K256::private_to_public_key(std::span<const uint8_t> buffer) const {
   char *p = k256_private_to_public_key(buffer.data());
   if (!p)
     return std::nullopt;
+  std::string s(p);
+  k256_free_string(p);
+  return s;
+}
+
+std::optional<std::string>
+K256::pubkey_parse(std::span<const uint8_t> buffer) const {
+  // Unlike the other entry points in this library, k256_pubkey_parse has no
+  // null path: rejection is reported as "ERR", and str_to_c_string cannot
+  // fail for "ERR"/"OK:<hex>". Assert rather than returning std::nullopt,
+  // which the driver reads as "module does not implement this target" and
+  // would silently drop this module from the comparison.
+  char *p = k256_pubkey_parse(buffer.data(), buffer.size());
+  assert(p);
   std::string s(p);
   k256_free_string(p);
   return s;

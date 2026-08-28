@@ -309,9 +309,27 @@ services:
       args:
         CXXFLAGS: "-DDECRED_SECP256K1 -DSECP256K1 -DNBITCOIN_SECP256K1 -DRUST_K256"
         FUZZ: sign_compact
-    env_file: .env
     environment:
       MODULES: ${MODULES:-}
+      LIBFUZZ_DETECT_LEAKS: 0
+      ASAN_OPTIONS: detect_leaks=0
+    env_file: .env
+    volumes:
+      - ./docker:/app/data
+
+  pubkey_parse:
+    build:
+      context: .
+      tags:
+        - bitcoinfuzz:pubkey_parse
+      args:
+        CXXFLAGS: "-DSECP256K1 -DRUST_K256 -DDECRED_SECP256K1"
+        FUZZ: pubkey_parse
+    environment:
+      MODULES: ${MODULES:-}
+      LIBFUZZ_DETECT_LEAKS: 0
+      ASAN_OPTIONS: detect_leaks=0
+    env_file: .env
     volumes:
       - ./docker:/app/data
 
