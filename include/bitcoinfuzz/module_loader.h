@@ -141,6 +141,10 @@
 #include <modules/pycoin/module.h>
 #endif
 
+#ifdef ELECTRUM
+#include <modules/electrum/module.h>
+#endif
+
 #ifdef LIBBITCOIN_SYSTEM
 #include <modules/libbitcoinsystem/module.h>
 #endif

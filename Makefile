@@ -130,6 +130,10 @@ ifneq ($(findstring -DPYCOIN,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
 	MODULES += modules/pycoin/module.a
 endif
 
+ifneq ($(findstring -DELECTRUM,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
+	MODULES += modules/electrum/module.a
+endif
+
 ifneq ($(findstring -DRUST_MUSIG2,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
 	MODULES += modules/rustmusig2/module.a
 endif
@@ -177,7 +181,7 @@ ifneq ($(findstring -DTINY_MINISCRIPT,$(BASE_CXXFLAGS) $(CXXFLAGS)),)
 endif
 
 # Check for Python-based modules and add Python-related flags.
-ifneq (,$(filter -DEMBIT -DPYBITCOINKERNEL -DPYCOIN,$(BASE_CXXFLAGS) $(CXXFLAGS)))
+ifneq (,$(filter -DELECTRUM -DEMBIT -DPYBITCOINKERNEL -DPYCOIN,$(BASE_CXXFLAGS) $(CXXFLAGS)))
   PYTHON_LDFLAGS := $(shell python3-config --ldflags --embed)
 endif
 
