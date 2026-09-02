@@ -33,11 +33,11 @@ struct InputSummary {
     // PSBTv2 (BIP-370 says it then defaults to the final sequence number).
     sequence: Option<u32>,
     has_utxo: bool,
-    sigs: usize,
+    partial_signatures: usize,
     redeem_script_hex: String,
     witness_script_hex: String,
     // Raw PSBT_IN_SIGHASH_TYPE byte value, or 0 if unset.
-    sighash: u32,
+    sighash_type: u32,
     bip32_count: usize,
     // Whether the input carries a *non-empty* final scriptSig or scriptWitness.
     // Emptiness rather than presence is deliberate: Bitcoin Core stores
@@ -62,38 +62,53 @@ struct OutputSummary {
 fn format_result(lock_time: u32, inputs: &[InputSummary], outputs: &[OutputSummary]) -> String {
     let mut result = String::new();
 
-    result.push_str(&format!("lt={};", lock_time));
-    result.push_str(&format!("in={};", inputs.len()));
-    result.push_str(&format!("out={};", outputs.len()));
+    result.push_str(&format!("lock_time={};", lock_time));
+    result.push_str(&format!("inputs={};", inputs.len()));
+    result.push_str(&format!("outputs={};", outputs.len()));
 
     for (i, input) in inputs.iter().enumerate() {
         result.push_str(&format!(
-            "in{}prev={}:{};",
+            "input{}previous_output={}:{};",
             i, input.prev_txid, input.prev_vout
         ));
-        let seq = input.sequence.map(|s| s.to_string()).unwrap_or_default();
-        result.push_str(&format!("in{}seq={};", i, seq));
+        let sequence = input.sequence.map(|s| s.to_string()).unwrap_or_default();
+        result.push_str(&format!("input{}sequence={};", i, sequence));
 
         if input.has_utxo {
-            result.push_str(&format!("in{}utxo=1;", i));
+            result.push_str(&format!("input{}utxo=1;", i));
         }
 
-        result.push_str(&format!("in{}sigs={};", i, input.sigs));
-        result.push_str(&format!("in{}rs={};", i, input.redeem_script_hex));
-        result.push_str(&format!("in{}ws={};", i, input.witness_script_hex));
-        result.push_str(&format!("in{}sh={};", i, input.sighash));
-        result.push_str(&format!("in{}bip32={};", i, input.bip32_count));
+        result.push_str(&format!(
+            "input{}partial_signatures={};",
+            i, input.partial_signatures
+        ));
+        result.push_str(&format!(
+            "input{}redeem_script={};",
+            i, input.redeem_script_hex
+        ));
+        result.push_str(&format!(
+            "input{}witness_script={};",
+            i, input.witness_script_hex
+        ));
+        result.push_str(&format!("input{}sighash_type={};", i, input.sighash_type));
+        result.push_str(&format!("input{}bip32={};", i, input.bip32_count));
         if input.finalized {
-            result.push_str(&format!("in{}fin=1;", i));
+            result.push_str(&format!("input{}finalized=1;", i));
         }
     }
 
     for (i, output) in outputs.iter().enumerate() {
-        result.push_str(&format!("out{}val={};", i, output.value));
-        result.push_str(&format!("out{}script={};", i, output.script_hex));
-        result.push_str(&format!("out{}rs={};", i, output.redeem_script_hex));
-        result.push_str(&format!("out{}ws={};", i, output.witness_script_hex));
-        result.push_str(&format!("out{}bip32={};", i, output.bip32_count));
+        result.push_str(&format!("output{}val={};", i, output.value));
+        result.push_str(&format!("output{}script={};", i, output.script_hex));
+        result.push_str(&format!(
+            "output{}redeem_script={};",
+            i, output.redeem_script_hex
+        ));
+        result.push_str(&format!(
+            "output{}witness_script={};",
+            i, output.witness_script_hex
+        ));
+        result.push_str(&format!("output{}bip32={};", i, output.bip32_count));
     }
 
     result
@@ -115,7 +130,7 @@ fn try_parse_v0(data: &[u8]) -> Option<String> {
             prev_vout: txin.previous_output.vout,
             sequence: Some(txin.sequence.0),
             has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
-            sigs: psbt_input.partial_sigs.len(),
+            partial_signatures: psbt_input.partial_sigs.len(),
             redeem_script_hex: psbt_input
                 .redeem_script
                 .as_ref()
@@ -126,7 +141,7 @@ fn try_parse_v0(data: &[u8]) -> Option<String> {
                 .as_ref()
                 .map(|s| s.to_hex_string())
                 .unwrap_or_default(),
-            sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
+            sighash_type: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
             bip32_count: psbt_input.bip32_derivation.len(),
             finalized: psbt_input
                 .final_script_sig
@@ -260,7 +275,7 @@ fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
             prev_vout: psbt_input.spent_output_index,
             sequence: psbt_input.sequence.map(|s| s.0),
             has_utxo: psbt_input.witness_utxo.is_some() || psbt_input.non_witness_utxo.is_some(),
-            sigs: psbt_input.partial_sigs.len(),
+            partial_signatures: psbt_input.partial_sigs.len(),
             redeem_script_hex: psbt_input
                 .redeem_script
                 .as_ref()
@@ -271,7 +286,7 @@ fn try_parse_v2(data: &[u8]) -> Result<String, TryParseV2Error> {
                 .as_ref()
                 .map(|s| s.to_hex_string())
                 .unwrap_or_default(),
-            sighash: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
+            sighash_type: psbt_input.sighash_type.map(|s| s.to_u32()).unwrap_or(0),
             bip32_count: psbt_input.bip32_derivations.len(),
             finalized: psbt_input
                 .final_script_sig
@@ -324,6 +339,6 @@ pub unsafe extern "C" fn rust_psbt_psbt_parse(data: *const u8, len: usize) -> *m
         // entirely) rather than silently opted out, mirroring the other
         // PSBTv2-aware modules.
         Err(TryParseV2Error::ConflictingLockTime) => str_to_c_string("CONFLICTING_LOCKTIME"),
-        Err(TryParseV2Error::Invalid) => std::ptr::null_mut(),
+        Err(TryParseV2Error::Invalid) => str_to_c_string("INVALID"),
     }
 }

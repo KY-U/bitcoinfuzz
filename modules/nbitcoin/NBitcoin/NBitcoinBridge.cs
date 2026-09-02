@@ -227,24 +227,24 @@ public static class Bridge
             }
 
             var result = new StringBuilder();
-            result.Append($"lt={tx.LockTime.Value};");
-            result.Append($"in={tx.Inputs.Count};");
-            result.Append($"out={tx.Outputs.Count};");
+            result.Append($"lock_time={tx.LockTime.Value};");
+            result.Append($"inputs={tx.Inputs.Count};");
+            result.Append($"outputs={tx.Outputs.Count};");
 
             for (int i = 0; i < tx.Inputs.Count; i++)
             {
                 var txIn = tx.Inputs[i];
 
-                result.Append($"in{i}prev={txIn.PrevOut.Hash}:{txIn.PrevOut.N};");
+                result.Append($"input{i}previous_output={txIn.PrevOut.Hash}:{txIn.PrevOut.N};");
 
                 uint seqValue = txIn.Sequence.Value;
                 if (!isV2 || seqValue != Sequence.Final.Value || V2InputHasExplicitSequence(psbtBytes, i))
                 {
-                    result.Append($"in{i}seq={seqValue};");
+                    result.Append($"input{i}sequence={seqValue};");
                 }
                 else
                 {
-                    result.Append($"in{i}seq=;");
+                    result.Append($"input{i}sequence=;");
                 }
 
                 if (i < psbt.Inputs.Count)
@@ -254,31 +254,31 @@ public static class Bridge
 
                     if (hasUtxo)
                     {
-                        result.Append($"in{i}utxo=1;");
+                        result.Append($"input{i}utxo=1;");
                     }
 
-                    int sigCount = psbtInput.PartialSigs?.Count ?? 0;
-                    result.Append($"in{i}sigs={sigCount};");
+                    int partialSignatureCount = psbtInput.PartialSigs?.Count ?? 0;
+                    result.Append($"input{i}partial_signatures={partialSignatureCount};");
 
-                    result.Append($"in{i}rs={psbtInput.RedeemScript?.ToHex() ?? ""};");
-                    result.Append($"in{i}ws={psbtInput.WitnessScript?.ToHex() ?? ""};");
+                    result.Append($"input{i}redeem_script={psbtInput.RedeemScript?.ToHex() ?? ""};");
+                    result.Append($"input{i}witness_script={psbtInput.WitnessScript?.ToHex() ?? ""};");
 
                     // Raw PSBT_IN_SIGHASH_TYPE byte value, or 0 if unset.
                     // SighashType/TaprootSighashType are mutually exclusive
                     // (legacy vs taproot input); both enums are backed by
                     // the same raw byte values as the wire format.
-                    uint sighash = 0;
+                    uint sighashType = 0;
                     if (psbtInput.SighashType.HasValue)
                     {
-                        sighash = (uint)psbtInput.SighashType.Value;
+                        sighashType = (uint)psbtInput.SighashType.Value;
                     }
                     else if (psbtInput.TaprootSighashType.HasValue)
                     {
-                        sighash = (uint)psbtInput.TaprootSighashType.Value;
+                        sighashType = (uint)psbtInput.TaprootSighashType.Value;
                     }
-                    result.Append($"in{i}sh={sighash};");
+                    result.Append($"input{i}sighash_type={sighashType};");
 
-                    result.Append($"in{i}bip32={psbtInput.HDKeyPaths.Count};");
+                    result.Append($"input{i}bip32={psbtInput.HDKeyPaths.Count};");
 
                     // Report finalization on a *non-empty* final
                     // scriptSig/scriptWitness rather than mere presence, which
@@ -294,7 +294,7 @@ public static class Bridge
                         || !WitScript.IsNullOrEmpty(psbtInput.FinalScriptWitness);
                     if (finalized)
                     {
-                        result.Append($"in{i}fin=1;");
+                        result.Append($"input{i}finalized=1;");
                     }
                 }
             }
@@ -304,17 +304,17 @@ public static class Bridge
                 var txOut = tx.Outputs[i];
 
                 long value = txOut.Value.Satoshi;
-                result.Append($"out{i}val={value};");
+                result.Append($"output{i}val={value};");
 
                 string scriptHex = txOut.ScriptPubKey.ToHex();
-                result.Append($"out{i}script={scriptHex};");
+                result.Append($"output{i}script={scriptHex};");
 
                 if (i < psbt.Outputs.Count)
                 {
                     var psbtOutput = psbt.Outputs[i];
-                    result.Append($"out{i}rs={psbtOutput.RedeemScript?.ToHex() ?? ""};");
-                    result.Append($"out{i}ws={psbtOutput.WitnessScript?.ToHex() ?? ""};");
-                    result.Append($"out{i}bip32={psbtOutput.HDKeyPaths.Count};");
+                    result.Append($"output{i}redeem_script={psbtOutput.RedeemScript?.ToHex() ?? ""};");
+                    result.Append($"output{i}witness_script={psbtOutput.WitnessScript?.ToHex() ?? ""};");
+                    result.Append($"output{i}bip32={psbtOutput.HDKeyPaths.Count};");
                 }
             }
 
@@ -322,7 +322,7 @@ public static class Bridge
         }
         catch
         {
-            return Marshal.StringToHGlobalAnsi("");
+            return Marshal.StringToHGlobalAnsi("INVALID");
         }
     }
 

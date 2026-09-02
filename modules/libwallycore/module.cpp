@@ -321,16 +321,16 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
   int res = wally_psbt_from_bytes(buffer.data(), buffer.size(),
                                   WALLY_PSBT_PARSE_FLAG_STRICT, &psbt);
   if (res != WALLY_OK) {
-    return std::nullopt;
+    return std::string{"INVALID"};
   }
 
   std::ostringstream result;
 
   if (psbt->tx) {
     // PSBTv0: the global unsigned tx carries locktime/inputs/outputs.
-    result << "lt=" << psbt->tx->locktime << ";";
-    result << "in=" << psbt->tx->num_inputs << ";";
-    result << "out=" << psbt->tx->num_outputs << ";";
+    result << "lock_time=" << psbt->tx->locktime << ";";
+    result << "inputs=" << psbt->tx->num_inputs << ";";
+    result << "outputs=" << psbt->tx->num_outputs << ";";
 
     for (size_t i = 0; i < psbt->tx->num_inputs; i++) {
       if (i < psbt->num_inputs) {
@@ -344,30 +344,32 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
         bool ok = hex_encode(txhash_reversed.data(), 32, txhash_hex.data(),
                              txhash_hex.size());
         assert(ok);
-        result << "in" << i << "prev=" << txhash_hex.data() << ":" << txin.index
-               << ";";
-        result << "in" << i << "seq=" << txin.sequence << ";";
+        result << "input" << i << "previous_output=" << txhash_hex.data() << ":"
+               << txin.index << ";";
+        result << "input" << i << "sequence=" << txin.sequence << ";";
 
         if (psbt_input.utxo || psbt_input.witness_utxo) {
-          result << "in" << i << "utxo=1" << ";";
+          result << "input" << i << "utxo=1" << ";";
         }
 
-        result << "in" << i << "sigs=" << psbt_input.signatures.num_items
+        result << "input" << i
+               << "partial_signatures=" << psbt_input.signatures.num_items
                << ";";
 
-        result << "in" << i << "rs="
+        result << "input" << i << "redeem_script="
                << GetMapFieldHex(psbt_input.psbt_fields,
                                  PSBT_IN_REDEEM_SCRIPT_KT)
                << ";";
-        result << "in" << i << "ws="
+        result << "input" << i << "witness_script="
                << GetMapFieldHex(psbt_input.psbt_fields,
                                  PSBT_IN_WITNESS_SCRIPT_KT)
                << ";";
-        result << "in" << i << "sh=" << psbt_input.sighash << ";";
-        result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
+        result << "input" << i << "sighash_type=" << psbt_input.sighash << ";";
+        result << "input" << i << "bip32=" << psbt_input.keypaths.num_items
+               << ";";
 
         if (IsFinalized(psbt_input)) {
-          result << "in" << i << "fin=1;";
+          result << "input" << i << "finalized=1;";
         }
       }
     }
@@ -385,29 +387,29 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       // convention (see modules/bitcoin/module.cpp), so a fuzzer-generated
       // amount near UINT64_MAX formats identically instead of one module
       // printing it as a huge unsigned value and the others as negative.
-      result << "out" << i << "val=" << static_cast<int64_t>(txout.satoshi)
+      result << "output" << i << "val=" << static_cast<int64_t>(txout.satoshi)
              << ";";
-      result << "out" << i << "script=" << script_hex.data() << ";";
+      result << "output" << i << "script=" << script_hex.data() << ";";
 
       if (i < psbt->num_outputs) {
         const wally_psbt_output &psbt_output = psbt->outputs[i];
-        result << "out" << i << "rs="
+        result << "output" << i << "redeem_script="
                << GetMapFieldHex(psbt_output.psbt_fields,
                                  PSBT_OUT_REDEEM_SCRIPT_KT)
                << ";";
-        result << "out" << i << "ws="
+        result << "output" << i << "witness_script="
                << GetMapFieldHex(psbt_output.psbt_fields,
                                  PSBT_OUT_WITNESS_SCRIPT_KT)
                << ";";
-        result << "out" << i << "bip32=" << psbt_output.keypaths.num_items
+        result << "output" << i << "bip32=" << psbt_output.keypaths.num_items
                << ";";
       }
     }
   } else {
     // PSBTv2 (BIP-370): tx data is per-input/output instead of a global
     // unsigned tx.
-    const std::optional<uint32_t> lt = DetermineV2LockTime(psbt);
-    if (!lt.has_value()) {
+    const std::optional<uint32_t> lock_time = DetermineV2LockTime(psbt);
+    if (!lock_time.has_value()) {
       wally_psbt_free(psbt);
       // Conflicting per-input lock time requirements (BIP-370). This is a
       // well-defined "reject" outcome, not a generic parse failure, so use a
@@ -417,9 +419,9 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       return std::string{"CONFLICTING_LOCKTIME"};
     }
 
-    result << "lt=" << *lt << ";";
-    result << "in=" << psbt->num_inputs << ";";
-    result << "out=" << psbt->num_outputs << ";";
+    result << "lock_time=" << *lock_time << ";";
+    result << "inputs=" << psbt->num_inputs << ";";
+    result << "outputs=" << psbt->num_outputs << ";";
 
     for (size_t i = 0; i < psbt->num_inputs; i++) {
       const wally_psbt_input &psbt_input = psbt->inputs[i];
@@ -431,35 +433,37 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       bool ok = hex_encode(txhash_reversed.data(), 32, txhash_hex.data(),
                            txhash_hex.size());
       assert(ok);
-      result << "in" << i << "prev=" << txhash_hex.data() << ":"
+      result << "input" << i << "previous_output=" << txhash_hex.data() << ":"
              << V2InputRawOutputIndex(buffer, i).value_or(psbt_input.index)
              << ";";
 
       if (psbt_input.sequence != WALLY_TX_SEQUENCE_FINAL ||
           V2InputHasExplicitSequence(buffer, i)) {
-        result << "in" << i << "seq=" << psbt_input.sequence << ";";
+        result << "input" << i << "sequence=" << psbt_input.sequence << ";";
       } else {
-        result << "in" << i << "seq=" << ";";
+        result << "input" << i << "sequence=" << ";";
       }
 
       if (psbt_input.utxo || psbt_input.witness_utxo) {
-        result << "in" << i << "utxo=1" << ";";
+        result << "input" << i << "utxo=1" << ";";
       }
 
-      result << "in" << i << "sigs=" << psbt_input.signatures.num_items << ";";
+      result << "input" << i
+             << "partial_signatures=" << psbt_input.signatures.num_items << ";";
 
-      result << "in" << i << "rs="
+      result << "input" << i << "redeem_script="
              << GetMapFieldHex(psbt_input.psbt_fields, PSBT_IN_REDEEM_SCRIPT_KT)
              << ";";
-      result << "in" << i << "ws="
+      result << "input" << i << "witness_script="
              << GetMapFieldHex(psbt_input.psbt_fields,
                                PSBT_IN_WITNESS_SCRIPT_KT)
              << ";";
-      result << "in" << i << "sh=" << psbt_input.sighash << ";";
-      result << "in" << i << "bip32=" << psbt_input.keypaths.num_items << ";";
+      result << "input" << i << "sighash_type=" << psbt_input.sighash << ";";
+      result << "input" << i << "bip32=" << psbt_input.keypaths.num_items
+             << ";";
 
       if (IsFinalized(psbt_input)) {
-        result << "in" << i << "fin=1;";
+        result << "input" << i << "finalized=1;";
       }
     }
 
@@ -471,21 +475,22 @@ LibwallyCore::psbt_parse(std::span<const uint8_t> buffer) const {
       bool ok = hex_encode(psbt_output.script, psbt_output.script_len,
                            script_hex.data(), script_hex.size());
       assert(ok);
-      result << "out" << i << "val="
+      result << "output" << i << "val="
              << static_cast<int64_t>(psbt_output.has_amount ? psbt_output.amount
                                                             : 0)
              << ";";
-      result << "out" << i << "script=" << script_hex.data() << ";";
+      result << "output" << i << "script=" << script_hex.data() << ";";
 
-      result << "out" << i << "rs="
+      result << "output" << i << "redeem_script="
              << GetMapFieldHex(psbt_output.psbt_fields,
                                PSBT_OUT_REDEEM_SCRIPT_KT)
              << ";";
-      result << "out" << i << "ws="
+      result << "output" << i << "witness_script="
              << GetMapFieldHex(psbt_output.psbt_fields,
                                PSBT_OUT_WITNESS_SCRIPT_KT)
              << ";";
-      result << "out" << i << "bip32=" << psbt_output.keypaths.num_items << ";";
+      result << "output" << i << "bip32=" << psbt_output.keypaths.num_items
+             << ";";
     }
   }
 

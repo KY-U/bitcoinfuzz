@@ -233,8 +233,8 @@ void Driver::PSBTParseTarget(std::span<const uint8_t> buffer) const {
     // Treat malformed parses consistently across modules. For this target, an
     // empty result or a zero-input/zero-output transaction is not a meaningful
     // successful parse and should not participate in differential comparison.
-    if (res->empty() || res->find("in=0") != std::string::npos ||
-        res->find("out=0") != std::string::npos)
+    if (res->empty() || res->find("inputs=0") != std::string::npos ||
+        res->find("outputs=0") != std::string::npos)
       continue;
 
     LogResponse(module.first, *res);

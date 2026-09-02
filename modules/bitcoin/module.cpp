@@ -577,20 +577,20 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
     return std::nullopt;
   }
 
-  util::Result<PartiallySignedTransaction> psbt_res{
+  util::Result<PartiallySignedTransaction> psbt_result{
       DecodeRawPSBT(std::as_bytes(buffer))};
-  if (!psbt_res) {
-    return std::string{};
+  if (!psbt_result) {
+    return std::string{"INVALID"};
   }
-  const PartiallySignedTransaction psbt{*psbt_res};
+  const PartiallySignedTransaction psbt{*psbt_result};
 
   std::string result;
 
   try {
     // Extract high-level transaction properties (matching rust-bitcoin format)
     // result += "v=" + std::to_string(tx.version) + ";";
-    const std::optional<uint32_t> lt{DeterminePSBTLockTime(psbt)};
-    if (!lt.has_value()) {
+    const std::optional<uint32_t> lock_time{DeterminePSBTLockTime(psbt)};
+    if (!lock_time.has_value()) {
       // Conflicting per-input lock time requirements (BIP-370). This is a
       // well-defined "reject" outcome, not a generic parse failure, so use a
       // non-empty sentinel (the driver's PSBTParseTarget skips empty results
@@ -598,24 +598,24 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
       // rejecting it, mirroring the other PSBTv2-aware modules.
       return std::string{"CONFLICTING_LOCKTIME"};
     }
-    result += "lt=" + std::to_string(*lt) + ";";
-    result += "in=" + std::to_string(psbt.inputs.size()) + ";";
-    result += "out=" + std::to_string(psbt.outputs.size()) + ";";
+    result += "lock_time=" + std::to_string(*lock_time) + ";";
+    result += "inputs=" + std::to_string(psbt.inputs.size()) + ";";
+    result += "outputs=" + std::to_string(psbt.outputs.size()) + ";";
 
     // Extract input information (matching rust-bitcoin format exactly)
     for (size_t i = 0; i < psbt.inputs.size(); i++) {
       const PSBTInput &psbt_input{psbt.inputs.at(i)};
 
       // Previous output reference in format "txid:vout"
-      result += "in" + std::to_string(i) +
-                "prev=" + psbt_input.prev_txid.ToString() + ":" +
+      result += "input" + std::to_string(i) +
+                "previous_output=" + psbt_input.prev_txid.ToString() + ":" +
                 std::to_string(psbt_input.prev_out) + ";";
 
       // Sequence number
-      const auto seq{psbt_input.sequence.has_value()
-                         ? std::to_string(psbt_input.sequence.value())
-                         : ""};
-      result += "in" + std::to_string(i) + "seq=" + seq + ";";
+      const auto sequence{psbt_input.sequence.has_value()
+                              ? std::to_string(psbt_input.sequence.value())
+                              : ""};
+      result += "input" + std::to_string(i) + "sequence=" + sequence + ";";
 
       // UTXO availability (check both witness and non-witness UTXO)
       bool has_utxo = false;
@@ -623,33 +623,33 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
         has_utxo = true;
       }
       if (has_utxo) {
-        result += "in" + std::to_string(i) + "utxo=1;";
+        result += "input" + std::to_string(i) + "utxo=1;";
       }
 
       // Partial signatures count
-      result += "in" + std::to_string(i) +
-                "sigs=" + std::to_string(psbt_input.partial_sigs.size()) + ";";
+      result += "input" + std::to_string(i) + "partial_signatures=" +
+                std::to_string(psbt_input.partial_sigs.size()) + ";";
 
       // Redeem/witness scripts as hex
-      result += "in" + std::to_string(i) +
-                "rs=" + HexStr(psbt_input.redeem_script) + ";";
-      result += "in" + std::to_string(i) +
-                "ws=" + HexStr(psbt_input.witness_script) + ";";
+      result += "input" + std::to_string(i) +
+                "redeem_script=" + HexStr(psbt_input.redeem_script) + ";";
+      result += "input" + std::to_string(i) +
+                "witness_script=" + HexStr(psbt_input.witness_script) + ";";
 
       // Sighash type (0 if unset)
-      result += "in" + std::to_string(i) + "sh=" +
+      result += "input" + std::to_string(i) + "sighash_type=" +
                 std::to_string(static_cast<uint32_t>(
                     psbt_input.sighash_type.value_or(0))) +
                 ";";
 
       // BIP32 derivation count
-      result += "in" + std::to_string(i) +
+      result += "input" + std::to_string(i) +
                 "bip32=" + std::to_string(psbt_input.hd_keypaths.size()) + ";";
 
       // Finalized status
       if (!psbt_input.final_script_sig.empty() ||
           !psbt_input.final_script_witness.IsNull()) {
-        result += "in" + std::to_string(i) + "fin=1;";
+        result += "input" + std::to_string(i) + "finalized=1;";
       }
     }
 
@@ -658,26 +658,26 @@ Bitcoin::psbt_parse(std::span<const uint8_t> buffer) const {
       const PSBTOutput &psbt_output{psbt.outputs.at(i)};
 
       // Output value (cast to int64_t to match rust-bitcoin's i64 cast)
-      result += "out" + std::to_string(i) + "val=" +
+      result += "output" + std::to_string(i) + "val=" +
                 std::to_string(static_cast<int64_t>(psbt_output.amount)) + ";";
 
       // Output script as hex string
-      result += "out" + std::to_string(i) +
+      result += "output" + std::to_string(i) +
                 "script=" + HexStr(psbt_output.script) + ";";
 
       // Redeem/witness scripts as hex
-      result += "out" + std::to_string(i) +
-                "rs=" + HexStr(psbt_output.redeem_script) + ";";
-      result += "out" + std::to_string(i) +
-                "ws=" + HexStr(psbt_output.witness_script) + ";";
+      result += "output" + std::to_string(i) +
+                "redeem_script=" + HexStr(psbt_output.redeem_script) + ";";
+      result += "output" + std::to_string(i) +
+                "witness_script=" + HexStr(psbt_output.witness_script) + ";";
 
       // BIP32 derivation count
-      result += "out" + std::to_string(i) +
+      result += "output" + std::to_string(i) +
                 "bip32=" + std::to_string(psbt_output.hd_keypaths.size()) + ";";
     }
 
   } catch (const std::exception &e) {
-    return std::string{};
+    return std::string{"INVALID"};
   }
 
   return result;
