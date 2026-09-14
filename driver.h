@@ -74,5 +74,6 @@ public:
   void Musig2SignSessionTarget(std::span<const uint8_t> buffer) const;
   void SilentPaymentsCreateOutputsTarget(std::span<const uint8_t> buffer) const;
   void Bech32RoundtripTarget(std::span<const uint8_t> buffer) const;
+  void Bech32ConvertBitsTarget(std::span<const uint8_t> buffer) const;
 };
 } // namespace bitcoinfuzz

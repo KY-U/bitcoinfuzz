@@ -566,3 +566,17 @@ services:
       MODULES: ${MODULES:-}
     volumes:
       - ./docker:/app/data
+
+  bech32_convert_bits:
+    build:
+      context: .
+      tags:
+        - bitcoinfuzz:bech32_convert_bits
+      args:
+        CXXFLAGS: "-DBITCOIN_CORE -DBTCD"
+        FUZZ: bech32_convert_bits
+    env_file: .env
+    environment:
+      MODULES: ${MODULES:-}
+    volumes:
+      - ./docker:/app/data

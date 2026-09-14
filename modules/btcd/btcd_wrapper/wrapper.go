@@ -506,6 +506,17 @@ func BTCDBech32SegwitRoundtrip(hrpData C.ByteArray, witver C.int, progData C.Byt
 	))
 }
 
+//export BTCDBech32ConvertBits
+func BTCDBech32ConvertBits(data C.ByteArray, fromBits C.int, toBits C.int, pad C.int) *C.char {
+	in := C.GoBytes(unsafe.Pointer(data.data), data.length)
+
+	regrouped, err := bech32.ConvertBits(in, uint8(fromBits), uint8(toBits), pad != 0)
+	if err != nil {
+		return C.CString("ERR")
+	}
+	return C.CString(fmt.Sprintf("OK:%x", regrouped))
+}
+
 //export BTCDBip32MasterKeygen
 func BTCDBip32MasterKeygen(data C.ByteArray) *C.char {
 	seed := C.GoBytes(unsafe.Pointer(data.data), data.length)

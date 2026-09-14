@@ -79,6 +79,22 @@ struct Bech32SegwitInput {
   std::vector<uint8_t> program;
 };
 
+// Input for the 5 <-> 8 bit regrouping primitive that sits under every bech32
+// codec. Exposed on its own because an address encoder only ever produces
+// well-formed groups, leaving the padding rules -- incomplete trailing groups,
+// non-zero padding bits, padding on versus off -- untested along that path.
+// Every 5-bit group fits in 5 bits: values above 31 are outside the contract
+// of these helpers and the implementations diverge on them by design.
+struct Bech32ConvertBitsInput {
+  // Source group size in bits. Either 5 or 8; to_bits is always the other one.
+  uint8_t from_bits{8};
+  uint8_t to_bits{5};
+  // Whether a trailing incomplete group is zero-padded (encode direction) or
+  // must be absent/zero (decode direction).
+  bool pad{false};
+  std::vector<uint8_t> data;
+};
+
 class BaseModule {
 public:
   const std::string name;
@@ -205,6 +221,10 @@ public:
   // output.
   virtual std::optional<std::string>
   bech32_segwit_roundtrip(const Bech32SegwitInput &input) const;
+  // Regroups input.data from input.from_bits to input.to_bits. Returns
+  // "OK:<hex>" or "ERR" when the implementation rejects the input.
+  virtual std::optional<std::string>
+  bech32_convert_bits(const Bech32ConvertBitsInput &input) const;
 
   virtual ~BaseModule() noexcept;
 };

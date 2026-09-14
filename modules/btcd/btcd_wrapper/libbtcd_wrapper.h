@@ -104,6 +104,7 @@ extern char* BTCDTransactionEval(ByteArray data);
 extern char* BTCDParsePSBT(ByteArray data);
 extern char* BTCDAddress(ByteArray data);
 extern char* BTCDBech32SegwitRoundtrip(ByteArray hrpData, int witver, ByteArray progData);
+extern char* BTCDBech32ConvertBits(ByteArray data, int fromBits, int toBits, int pad);
 extern char* BTCDBip32MasterKeygen(ByteArray data);
 extern char* BTCDSignSchnorr(ByteArray privKey, ByteArray hash, ByteArray aux);
 extern char* BTCDDecodeEllswift(ByteArray buffer);

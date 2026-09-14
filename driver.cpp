@@ -1076,6 +1076,55 @@ std::string HexString(std::span<const uint8_t> bytes) {
 }
 } // namespace
 
+void Driver::Bech32ConvertBitsTarget(std::span<const uint8_t> buffer) const {
+  FuzzedDataProvider provider(buffer.data(), buffer.size());
+
+  Bech32ConvertBitsInput input;
+  // 5->8 is the decode direction (unpacking base32 groups into bytes), 8->5
+  // the encode direction.
+  const bool unpack{provider.ConsumeBool()};
+  input.from_bits = unpack ? 5 : 8;
+  input.to_bits = unpack ? 8 : 5;
+  input.pad = provider.ConsumeBool();
+  input.data = provider.ConsumeRemainingBytes<uint8_t>();
+  // 5-bit groups are masked to their range. A group above 31 is outside the
+  // contract of every implementation here, and they diverge on it by design
+  // rather than by accident: Core folds the excess bits into the accumulator
+  // (and documents that callers must range-check), btcd drops them. Feeding
+  // such groups in would only ever report that known split, so the budget goes
+  // to the in-contract rules instead: incomplete trailing groups, non-zero
+  // padding bits, and padding on versus off.
+  if (input.from_bits == 5) {
+    for (uint8_t &b : input.data)
+      b &= 0x1f;
+  }
+
+  std::optional<std::string> last_response{std::nullopt};
+  std::string last_module_name;
+
+  for (auto &module : modules) {
+    std::optional<std::string> res{module.second->bech32_convert_bits(input)};
+    if (!res.has_value())
+      continue;
+
+    LogResponse(module.first, *res);
+
+    if (last_response.has_value() && *res != *last_response) {
+      std::cout << "Input convert bits: " << static_cast<int>(input.from_bits)
+                << "->" << static_cast<int>(input.to_bits)
+                << " pad=" << (input.pad ? "1" : "0")
+                << " data=" << HexString(input.data) << "\n";
+      std::cout << "MISMATCH DETECTED between " << last_module_name << " and "
+                << module.first << "!" << "\n";
+      std::cout << "  " << last_module_name << ": " << *last_response << "\n";
+      std::cout << "  " << module.first << ": " << *res << std::endl;
+      assert(*res == *last_response);
+    }
+    last_response = *res;
+    last_module_name = module.first;
+  }
+}
+
 void Driver::Bech32RoundtripTarget(std::span<const uint8_t> buffer) const {
   FuzzedDataProvider provider(buffer.data(), buffer.size());
 
@@ -1240,6 +1289,8 @@ void Driver::Run(const uint8_t *data, const size_t size,
     this->SilentPaymentsCreateOutputsTarget(buffer);
   } else if (target == "bech32_roundtrip") {
     this->Bech32RoundtripTarget(buffer);
+  } else if (target == "bech32_convert_bits") {
+    this->Bech32ConvertBitsTarget(buffer);
   } else {
     std::cout << "Unknown target: " << target << std::endl;
     assert(false);

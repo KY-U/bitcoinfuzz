@@ -981,5 +981,26 @@ Bitcoin::bech32_segwit_roundtrip(const Bech32SegwitInput &input) const {
          HexStr(program);
 }
 
+std::optional<std::string>
+Bitcoin::bech32_convert_bits(const Bech32ConvertBitsInput &input) const {
+  std::vector<uint8_t> out;
+  const auto sink = [&](uint8_t c) { out.push_back(c); };
+
+  bool ok{false};
+  if (input.from_bits == 5 && input.pad)
+    ok = ConvertBits<5, 8, true>(sink, input.data.begin(), input.data.end());
+  else if (input.from_bits == 5)
+    ok = ConvertBits<5, 8, false>(sink, input.data.begin(), input.data.end());
+  else if (input.pad)
+    ok = ConvertBits<8, 5, true>(sink, input.data.begin(), input.data.end());
+  else
+    ok = ConvertBits<8, 5, false>(sink, input.data.begin(), input.data.end());
+
+  // Reported verbatim, with no range check added on top. Core's ConvertBits
+  // documents that groups must fit in from_bits and leaves it to its callers;
+  // the driver only ever passes groups that do.
+  return ok ? "OK:" + HexStr(out) : "ERR";
+}
+
 } // namespace module
 } // namespace bitcoinfuzz
