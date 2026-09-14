@@ -213,4 +213,9 @@ std::optional<std::string> BaseModule::silentpayments_create_outputs(
   return std::nullopt;
 }
 
+std::optional<std::string>
+BaseModule::bech32_segwit_roundtrip(const Bech32SegwitInput & /*input*/) const {
+  return std::nullopt;
+}
+
 } // namespace bitcoinfuzz

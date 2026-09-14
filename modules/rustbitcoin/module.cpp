@@ -168,5 +168,18 @@ Rustbitcoin::partial_merkle_tree(std::span<const uint8_t> buffer) const {
   return result;
 }
 
+std::optional<std::string>
+Rustbitcoin::bech32_segwit_roundtrip(const Bech32SegwitInput &input) const {
+  auto result_ptr = rust_bitcoin_bech32_segwit_roundtrip(
+      reinterpret_cast<const uint8_t *>(input.hrp.data()), input.hrp.size(),
+      input.witver, input.program.data(), input.program.size());
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  free_c_string(result_ptr);
+  return result;
+}
+
 } // namespace module
 } // namespace bitcoinfuzz

@@ -7,6 +7,7 @@
 const TranslateFn G_TRANSLATION_FUN{nullptr};
 
 #include "base58.h"
+#include "bech32.h"
 #include "blockencodings.h"
 #include "chainparams.h"
 #include "consensus/merkle.h"
@@ -31,6 +32,7 @@ const TranslateFn G_TRANSLATION_FUN{nullptr};
 #include "streams.h"
 #include "util/bip32.h"
 #include "util/chaintype.h"
+#include "util/strencodings.h"
 #include "validation.h"
 
 namespace {
@@ -483,6 +485,20 @@ std::optional<std::string> Bitcoin::address_parse(std::string str) const {
         result = "WSH:";
       } else if (std::holds_alternative<WitnessV1Taproot>(dest)) {
         result = "TR:";
+      } else if (std::holds_alternative<PayToAnchor>(dest) ||
+                 std::holds_alternative<WitnessUnknown>(dest)) {
+        // Witness versions with no defined meaning yet, plus P2A. Reported
+        // with the decoded version and program rather than as an opaque
+        // "UNK:" so the driver can still compare what was decoded against
+        // the other implementations that accept these.
+        const WitnessUnknown &unknown =
+            std::holds_alternative<PayToAnchor>(dest)
+                ? static_cast<const WitnessUnknown &>(
+                      std::get<PayToAnchor>(dest))
+                : std::get<WitnessUnknown>(dest);
+        return "WITNESS_UNKNOWN:v" +
+               std::to_string(unknown.GetWitnessVersion()) + ":" +
+               HexStr(unknown.GetWitnessProgram());
       } else {
         result = "UNK:";
       }
@@ -925,6 +941,44 @@ Bitcoin::aes256_cbc(std::span<const uint8_t> key, std::span<const uint8_t> iv,
   }
 
   return "enc=" + enc_res + " dec=" + dec_res;
+}
+
+std::optional<std::string>
+Bitcoin::bech32_segwit_roundtrip(const Bech32SegwitInput &input) const {
+  std::vector<uint8_t> values{input.witver};
+  ConvertBits<8, 5, true>([&](uint8_t c) { values.push_back(c); },
+                          input.program.begin(), input.program.end());
+
+  // bech32::Encode is the bare codec: it neither knows about the BIP-173 90
+  // character limit nor about witness program sizes, so both are applied here.
+  // The driver only ever compares inputs that stay inside the limit, but
+  // applying it keeps this module's answer meaningful on its own terms rather
+  // than reporting an address no conformant decoder would take.
+  if (input.hrp.size() + 1 + values.size() + bech32::CHECKSUM_SIZE >
+      bech32::CharLimit::BECH32)
+    return "ENC:FAIL";
+
+  const std::string address{bech32::Encode(
+      input.witver == 0 ? bech32::Encoding::BECH32 : bech32::Encoding::BECH32M,
+      input.hrp, values)};
+
+  const bech32::DecodeResult decoded{bech32::Decode(address)};
+  if (decoded.encoding == bech32::Encoding::INVALID || decoded.data.empty() ||
+      decoded.hrp != input.hrp)
+    return "ENC:" + address + "|DEC:FAIL";
+
+  const uint8_t version{decoded.data[0]};
+  const bool expect_bech32m{version != 0};
+  if (expect_bech32m != (decoded.encoding == bech32::Encoding::BECH32M))
+    return "ENC:" + address + "|DEC:FAIL";
+
+  std::vector<uint8_t> program;
+  if (!ConvertBits<5, 8, false>([&](uint8_t c) { program.push_back(c); },
+                                decoded.data.begin() + 1, decoded.data.end()))
+    return "ENC:" + address + "|DEC:FAIL";
+
+  return "ENC:" + address + "|DEC:v" + std::to_string(version) + ":" +
+         HexStr(program);
 }
 
 } // namespace module
