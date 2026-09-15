@@ -188,6 +188,11 @@ BaseModule::partial_merkle_tree(std::span<const uint8_t> /*buffer*/) const {
 }
 
 std::optional<std::string>
+BaseModule::sighash_compute(const SighashComputeInput & /*input*/) const {
+  return std::nullopt;
+}
+
+std::optional<std::string>
 BaseModule::bip32_derive_from_path(std::span<const uint8_t> /*buffer*/) const {
   return std::nullopt;
 }

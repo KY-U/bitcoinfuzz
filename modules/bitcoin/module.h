@@ -36,6 +36,8 @@ public:
   std::optional<std::string>
   partial_merkle_tree(std::span<const uint8_t> buffer) const override;
   std::optional<std::string>
+  sighash_compute(const SighashComputeInput &input) const override;
+  std::optional<std::string>
   bip32_master_keygen(std::span<const uint8_t> buffer) const override;
   std::optional<std::string> bip32_deserialize_extended_key(
       std::span<const uint8_t> buffer) const override;
