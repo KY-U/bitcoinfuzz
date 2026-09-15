@@ -38,6 +38,8 @@ public:
       const std::vector<std::vector<uint8_t>> &hashes) const override;
   std::optional<std::string>
   partial_merkle_tree(std::span<const uint8_t> buffer) const override;
+  std::optional<std::string>
+  bech32_segwit_roundtrip(const Bech32SegwitInput &input) const override;
   ~Rustbitcoin() noexcept override = default;
 };
 
