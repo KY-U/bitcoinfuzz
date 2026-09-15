@@ -1,7 +1,6 @@
 #include "module.h"
 #include "bitcoinkernel_variant_symbol_prefix.h"
 
-#include <hash.h>
 #include <kernel/bitcoinkernel_wrapper.h>
 
 #include <array>
@@ -182,37 +181,10 @@ char *libbitcoinkernel_transaction_eval(std::span<const uint8_t> buffer) {
     if (!btck::CheckTransaction(transaction, state))
       return strdup("0");
 
-    // Since bitcoinkernel does not provide a public interface for getting the
-    // witness hash, we calculate it manually using core's internal API.
-    // TODO: Swap wtxid calculation for kernel's getter when it becomes
-    // available.
-    //
-    // Check if the transaction has witness data to avoid unnecessary
-    // hashing in the case of non-witness-transactions.
-    bool has_witness{false};
-    for (const auto &input : transaction.Inputs()) {
-      if (input.GetWitnessStack().CountItems() != 0) {
-        has_witness = true;
-        break;
-      }
-    }
-
-    // ToBytes() serializes the transaction using TX_WITH_WITNESS
-    // serialization-parameter object, so we can hash the serialized bytes.
     const auto transaction_bytes = transaction.ToBytes();
-    std::array<unsigned char, CHash256::OUTPUT_SIZE> witness_hash{};
-    if (!has_witness) {
-      const auto txid = transaction.Txid().ToBytes();
-      std::memcpy(witness_hash.data(), txid.data(), txid.size());
-    } else {
-      const std::span<const unsigned char> hash_input{
-          reinterpret_cast<const unsigned char *>(transaction_bytes.data()),
-          transaction_bytes.size()};
-      CHash256{}.Write(hash_input).Finalize(witness_hash);
-    }
+    const auto wtxid_bytes = transaction.Wtxid().ToBytes();
 
-    std::string result =
-        bytes_to_hex_reversed(std::as_bytes(std::span{witness_hash}));
+    std::string result = bytes_to_hex_reversed(wtxid_bytes);
     result += std::to_string(transaction_bytes.size());
     return strdup(result.c_str());
   } catch (...) {
