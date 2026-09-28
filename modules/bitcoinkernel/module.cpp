@@ -190,6 +190,25 @@ char *libbitcoinkernel_transaction_eval(std::span<const uint8_t> buffer) {
     return strdup("0");
   }
 }
+
+char *libbitcoinkernel_deserialize_block(std::span<const uint8_t> buffer) {
+    try {
+        const auto raw_span = std::as_bytes(buffer);
+        btck::Block block{raw_span};
+
+        btck::BlockValidationState state{};
+        btck::ChainParams chain_params{btck::ChainType::MAINNET};
+        auto consensus_params = chain_params.GetConsensusParams();
+        auto flags = btck::BlockCheckFlags::MERKLE;
+        if (!block.Check(consensus_params, flags, state))
+            return strdup("0");
+
+
+    } catch (...) {
+        return strdup("0");
+    }
+}
+
 } // namespace
 
 namespace bitcoinfuzz {
@@ -238,6 +257,17 @@ BitcoinKernel::transaction_eval(std::span<const uint8_t> buffer) const {
   std::string result(result_ptr);
   free(result_ptr);
   return result;
+}
+
+std::optional<std::string>
+BitcoinKernel::deserialize_block(std::span<const uint8_t> buffer) const {
+  auto result_ptr = libbitcoinkernel_deserialize_block(buffer);
+  if (result_ptr == nullptr)
+    return std::nullopt;
+
+  std::string result(result_ptr);
+  free(result_ptr);
+  return;
 }
 
 } // namespace module
