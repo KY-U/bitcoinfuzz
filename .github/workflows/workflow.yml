@@ -86,6 +86,7 @@ jobs:
           -DBITCOIN_RS \
           -DRUSTBITCOINKERNEL \
           -DRUST_MINISCRIPT \
+          -DTINY_MINISCRIPT \
           -DBITCOINERLAB_MINISCRIPT \
           -DRUST_PSBT \
           -DRUST_MUSIG2 \
@@ -130,6 +131,7 @@ jobs:
             modules/
             custommutator/
             bitcoinfuzz
+            libtiny_miniscript_lib.so
             NBitcoin.CppBridge.so
             NBitcoinSecp256k1.CppBridge.so
             build.env
@@ -167,7 +169,7 @@ jobs:
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "miniscript_parse_clean"
             target: "miniscript_parse"
-            cxxflags: "-DBITCOIN_CORE -DRUST_MINISCRIPT -DBITCOINERLAB_MINISCRIPT"
+            cxxflags: "-DBITCOIN_CORE -DRUST_MINISCRIPT -DBITCOINERLAB_MINISCRIPT -DTINY_MINISCRIPT"
             asan_options: "detect_leaks=0:detect_container_overflow=0"
           - corpus: "address_parse"
             target: "address_parse"

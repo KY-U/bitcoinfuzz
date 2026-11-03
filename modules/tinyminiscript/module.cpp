@@ -9,5 +9,10 @@ Tinyminiscript::Tinyminiscript(void) : BaseModule("Tinyminiscript") {}
 std::optional<bool> Tinyminiscript::descriptor_parse(std::string str) const {
   return tiny_miniscript_descriptor_parse(str.c_str());
 }
+
+std::optional<bool> Tinyminiscript::miniscript_parse(std::string str) const {
+  return tiny_miniscript_miniscript_parse(
+      reinterpret_cast<const uint8_t *>(str.data()), str.size());
+}
 } // namespace module
 } // namespace bitcoinfuzz

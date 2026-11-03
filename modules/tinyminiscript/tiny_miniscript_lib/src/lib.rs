@@ -20,3 +20,16 @@ pub unsafe extern "C" fn tiny_miniscript_descriptor_parse(input: *const c_char) 
         Ok(_) => true,
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn tiny_miniscript_miniscript_parse(input: *const c_char) -> bool {
+    let Ok(miniscript) = c_str_to_str(input) else {
+        return false;
+    };
+
+    let ts_miniscript = Context::try_from(miniscript);
+    match ts_miniscript {
+      Err(_) => false,
+      Ok(_) => true,
+    }
+}

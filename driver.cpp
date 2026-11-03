@@ -186,6 +186,14 @@ void Driver::MiniscriptParseTarget(std::span<const uint8_t> buffer) const {
   std::optional<bool> last_response{std::nullopt};
   std::string last_module_name;
   for (auto &module : modules) {
+    // Tinyminiscript uses the same parser for descriptors and bare miniscript.
+    // Descriptor wrappers and checksums are outside this target's input
+    // language.
+    if (module.first == "Tinyminiscript" &&
+        (miniscript.starts_with("sh(") || miniscript.starts_with("wsh(") ||
+         miniscript.starts_with("wpkh(") || miniscript.starts_with("tr(") ||
+         miniscript.find('#') != std::string::npos))
+      continue;
     std::optional<bool> res{module.second->miniscript_parse(miniscript)};
     if (!res.has_value())
       continue;

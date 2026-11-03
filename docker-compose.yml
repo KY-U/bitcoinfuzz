@@ -157,7 +157,7 @@ services:
       tags:
         - bitcoinfuzz:miniscript_parse
       args:
-        CXXFLAGS: "-DBITCOIN_CORE -DNBITCOIN -DRUST_MINISCRIPT -DEMBIT -DBITCOINERLAB_MINISCRIPT"
+        CXXFLAGS: "-DBITCOIN_CORE -DNBITCOIN -DRUST_MINISCRIPT -DEMBIT -DBITCOINERLAB_MINISCRIPT -DTINY_MINISCRIPT"
         FUZZ: miniscript_parse
     env_file: .env
     environment:
